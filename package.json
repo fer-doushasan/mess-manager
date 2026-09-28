@@ -1,0 +1,21 @@
+{
+  "name": "sweet-home-expense-manager",
+  "version": "1.0.0",
+  "description": "Sweet Home expense manager with bazar, meals, fixed costs, payments, and settlement reports.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "mess-management",
+    "meal-rate",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

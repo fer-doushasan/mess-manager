@@ -1,0 +1,197 @@
+{
+  "month": "2026-05",
+  "members": [
+    {
+      "id": "member_admin",
+      "name": "Ferdous",
+      "role": "admin",
+      "active": true,
+      "mobile": "01518910492",
+      "approved": true,
+      "password": "admin492",
+      "rentAmount": 2000,
+      "rentPaid": 2000
+    },
+    {
+      "id": "member_mahbub",
+      "name": "Mahbub",
+      "role": "member",
+      "active": true,
+      "mobile": "01700000001",
+      "approved": true,
+      "password": "mahbub123",
+      "rentAmount": 2000,
+      "rentPaid": 2000
+    },
+    {
+      "id": "member_bappy",
+      "name": "Bappy",
+      "role": "member",
+      "active": true,
+      "mobile": "01700000002",
+      "approved": true,
+      "password": "bappy123",
+      "rentAmount": 2400,
+      "rentPaid": 100
+    },
+    {
+      "id": "member_taufiq",
+      "name": "Taufiq",
+      "role": "member",
+      "active": true,
+      "mobile": "01700000003",
+      "approved": true,
+      "password": "taufiq123",
+      "rentAmount": 2900,
+      "rentPaid": 2800
+    },
+    {
+      "id": "member_habib",
+      "name": "Habib",
+      "role": "member",
+      "active": true,
+      "mobile": "01700000004",
+      "approved": true,
+      "password": "habib123",
+      "rentAmount": 2000,
+      "rentPaid": 100
+    },
+    {
+      "id": "member_miraj",
+      "name": "Miraj",
+      "role": "member",
+      "active": true,
+      "mobile": "01700000005",
+      "approved": true,
+      "password": "miraj123",
+      "rentAmount": 0,
+      "rentPaid": 0
+    },
+    {
+      "id": "member_alom",
+      "name": "Alom",
+      "role": "member",
+      "active": true,
+      "mobile": "01700000006",
+      "approved": true,
+      "password": "alom123",
+      "rentAmount": 0,
+      "rentPaid": 0
+    },
+    {
+      "id": "member_rakib",
+      "name": "Rakib",
+      "role": "member",
+      "active": false,
+      "mobile": "01700000007",
+      "approved": true,
+      "password": "rakib123",
+      "rentAmount": 0,
+      "rentPaid": 0
+    },
+    {
+      "id": "member_moo86ts5_65r25b",
+      "name": "rofix",
+      "role": "member",
+      "active": false,
+      "mobile": "01561215511",
+      "approved": false,
+      "password": "151313",
+      "rentAmount": 0,
+      "rentPaid": 0
+    },
+    {
+      "id": "member_moo884ct_x9shmk",
+      "name": "dncfms",
+      "role": "member",
+      "active": false,
+      "mobile": "1212156451",
+      "approved": false,
+      "password": "45132",
+      "rentAmount": 0,
+      "rentPaid": 0
+    }
+  ],
+  "fixedCosts": [
+    {
+      "id": "fixed_rent",
+      "label": "House rent",
+      "amount": 15000,
+      "splitType": "equal",
+      "allocations": {}
+    },
+    {
+      "id": "fixed_electricity",
+      "label": "Electricity bill",
+      "amount": 1800,
+      "splitType": "equal",
+      "allocations": {}
+    },
+    {
+      "id": "fixed_wifi",
+      "label": "WiFi bill",
+      "amount": 1000,
+      "splitType": "equal",
+      "allocations": {}
+    }
+  ],
+  "bazarEntries": [
+    {
+      "id": "bazar_ferdous_1",
+      "memberId": "member_admin",
+      "date": "2026-05-01",
+      "description": "Rice, dal, oil",
+      "amount": 1000
+    },
+    {
+      "id": "bazar_mahbub_1",
+      "memberId": "member_mahbub",
+      "date": "2026-05-02",
+      "description": "Vegetables",
+      "amount": 500
+    },
+    {
+      "id": "bazar_mopztwx6_1naynx",
+      "memberId": "member_admin",
+      "date": "2026-05-03",
+      "description": "Bazar",
+      "amount": 20
+    }
+  ],
+  "mealCounts": {
+    "member_admin": 25,
+    "member_mahbub": 20,
+    "member_bappy": 18,
+    "member_taufiq": 15,
+    "member_habib": 10,
+    "member_miraj": 8,
+    "member_alom": 6,
+    "member_rakib": 0,
+    "member_moo86ts5_65r25b": 0,
+    "member_moo884ct_x9shmk": 0
+  },
+  "individualCosts": [
+    {
+      "id": "individual_rakib_room",
+      "memberId": "member_rakib",
+      "label": "Personal room charge",
+      "amount": 1500
+    }
+  ],
+  "payments": [
+    {
+      "id": "payment_ferdous_1",
+      "memberId": "member_admin",
+      "date": "2026-05-03",
+      "note": "Cash deposit",
+      "amount": 4000
+    },
+    {
+      "id": "payment_bappy_1",
+      "memberId": "member_bappy",
+      "date": "2026-05-03",
+      "note": "Advance",
+      "amount": 7000
+    }
+  ]
+}
