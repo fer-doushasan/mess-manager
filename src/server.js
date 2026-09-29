@@ -1,15 +1,28 @@
 const express = require("express");
 const crypto = require("node:crypto");
 const path = require("node:path");
-const { calculateReport, money } = require("./calculator");
-const { nowId, readStore, sampleStore, updateStore, writeStore } = require("./store");
+const { money } = require("./calculator");
+const { hashPassword, verifyPassword } = require("./passwords");
+const { backend, initStore, monthReport, nowId, readStore, resetStore, startNextMonth, updateStore } = require("./store");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const sessions = new Map();
+const SESSION_DAYS = 30;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_FAILURES = 10;
+const loginFailures = new Map();
 
+// Hosts like Render terminate HTTPS at a proxy; this makes req.secure and req.ip correct.
+app.set("trust proxy", 1);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "public")));
+
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
 
 function requireText(value, fallback = "") {
   const text = String(value || "").trim();
@@ -44,23 +57,33 @@ function parseCookies(cookieHeader = "") {
   );
 }
 
-function setSessionCookie(res, sessionId) {
-  res.setHeader("Set-Cookie", `sessionId=${encodeURIComponent(sessionId)}; HttpOnly; Path=/; SameSite=Lax`);
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function setSessionCookie(req, res, token) {
+  const secure = req.secure ? "; Secure" : "";
+  const maxAge = SESSION_DAYS * 24 * 60 * 60;
+  res.setHeader(
+    "Set-Cookie",
+    `sessionId=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`
+  );
 }
 
 function clearSessionCookie(res) {
   res.setHeader("Set-Cookie", "sessionId=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0");
 }
 
-function createSession(memberId) {
-  const sessionId = crypto.randomBytes(24).toString("hex");
-  sessions.set(sessionId, { memberId, createdAt: Date.now() });
-  return sessionId;
+async function createSession(memberId) {
+  const token = crypto.randomBytes(24).toString("hex");
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  await backend.createSession(hashToken(token), memberId, expiresAt);
+  return token;
 }
 
-function clearSession(sessionId) {
-  if (sessionId) {
-    sessions.delete(sessionId);
+async function clearSession(token) {
+  if (token) {
+    await backend.deleteSession(hashToken(token));
   }
 }
 
@@ -80,8 +103,12 @@ function findActiveMember(store, memberId) {
   return store.members.find((member) => member.id === memberId && member.active !== false) || null;
 }
 
-function canManageMemberData(requestMember, memberId) {
-  return requestMember.role === "admin" || requestMember.id === memberId;
+function requireActiveMember(store, memberId) {
+  const member = findActiveMember(store, memberId);
+  if (!member) {
+    throw new HttpError(400, "Valid member is required.");
+  }
+  return member;
 }
 
 function findApprovedMemberByMobile(store, mobile) {
@@ -94,9 +121,27 @@ function findApprovedMemberByMobile(store, mobile) {
   );
 }
 
+function isLoginBlocked(key) {
+  const entry = loginFailures.get(key);
+  if (!entry || entry.resetAt <= Date.now()) {
+    loginFailures.delete(key);
+    return false;
+  }
+  return entry.count >= LOGIN_MAX_FAILURES;
+}
+
+function recordLoginFailure(key) {
+  const entry = loginFailures.get(key);
+  if (!entry || entry.resetAt <= Date.now()) {
+    loginFailures.set(key, { count: 1, resetAt: Date.now() + LOGIN_WINDOW_MS });
+    return;
+  }
+  entry.count += 1;
+}
+
 async function getRequestMember(req) {
-  const sessionId = parseCookies(req.headers.cookie).sessionId;
-  const session = sessionId ? sessions.get(sessionId) : null;
+  const token = parseCookies(req.headers.cookie).sessionId;
+  const session = token ? await backend.getSession(hashToken(token)) : null;
   if (!session) {
     return null;
   }
@@ -104,7 +149,7 @@ async function getRequestMember(req) {
   const store = await readStore();
   const member = findActiveMember(store, session.memberId);
   if (!member || member.approved === false) {
-    clearSession(sessionId);
+    await clearSession(token);
     return null;
   }
 
@@ -132,66 +177,147 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-async function getState(member) {
-  const store = await readStore();
+// Members get their own figures plus the mess's shared tables (bazar, meal calculation,
+// monthly settlement) for transparency, but never other members' mobile numbers,
+// payments, fixed-cost settings or admin data. Only the open month is included.
+const SHARED_ROW_FIELDS = [
+  "memberId",
+  "name",
+  "role",
+  "bazarPaid",
+  "mealCount",
+  "mealCost",
+  "mealPaid",
+  "mealTotalPaid",
+  "mealBalance",
+  "fixedBalance",
+  "fixedDue",
+  "previousBalance",
+  "balance",
+  "status"
+];
+
+function memberView(store, report, member) {
+  const names = new Map(store.members.map((item) => [item.id, item.name]));
+  const activeIds = new Set(report.rows.map((row) => row.memberId));
+  const pick = (row) => Object.fromEntries(SHARED_ROW_FIELDS.map((field) => [field, row[field]]));
   return {
-    viewer: member ? sanitizeMember(member) : null,
-    store: sanitizeStore(store),
-    report: calculateReport(store)
+    viewer: sanitizeMember(member),
+    settings: store.settings,
+    month: store.month,
+    me: report.rows.find((row) => row.memberId === member.id) || null,
+    summary: {
+      totalMembers: report.summary.totalMembers,
+      totalBazarCost: report.summary.totalBazarCost,
+      totalMeals: report.summary.totalMeals,
+      mealRate: report.summary.mealRate,
+      totalMealCost: report.summary.totalMealCost,
+      mealTotalPaid: report.summary.mealTotalPaid,
+      mealBalanceTotal: report.summary.mealBalanceTotal,
+      fixedDueTotal: report.summary.fixedDueTotal,
+      netBalance: report.summary.netBalance
+    },
+    members: report.rows.map(pick),
+    bazarEntries: store.bazarEntries
+      .filter((entry) => entry.month === store.month && activeIds.has(entry.memberId))
+      .map(({ id, memberId, date, description, amount }) => ({
+        id,
+        memberId,
+        memberName: names.get(memberId),
+        date,
+        description,
+        amount
+      })),
+    payments: store.payments.filter((entry) => entry.month === store.month && entry.memberId === member.id)
   };
 }
 
-app.get("/api/public-state", async (req, res, next) => {
-  try {
-    res.json(await getState(null));
-  } catch (error) {
-    next(error);
+async function getState(member) {
+  const store = await readStore();
+  const report = monthReport(store);
+  if (member.role !== "admin") {
+    return memberView(store, report, member);
   }
-});
+  return {
+    viewer: sanitizeMember(member),
+    settings: store.settings,
+    month: store.month,
+    store: sanitizeStore(store),
+    report,
+    previousMonths: store.history.map((closed) => ({
+      month: closed.month,
+      closedAt: closed.closedAt,
+      report: monthReport(store, closed.month)
+    }))
+  };
+}
 
-app.get("/api/session/options", async (req, res, next) => {
-  try {
-    const store = await readStore();
-    res.json({
-      members: sanitizeStore(store).members.filter((member) => member.active !== false)
-    });
-  } catch (error) {
-    next(error);
+// Closed months are history: their entries can be viewed but not changed.
+function requireOpenMonthEntry(store, entries, id, label) {
+  const entry = entries.find((item) => item.id === id);
+  if (!entry) {
+    throw new HttpError(404, `${label} not found.`);
   }
-});
+  if (entry.month !== store.month) {
+    throw new HttpError(400, `This ${label.toLowerCase()} belongs to a closed month and cannot be changed.`);
+  }
+  return entry;
+}
+
+// Members act only on their own account; asking to act for someone else is refused,
+// not silently redirected.
+function targetMemberId(req) {
+  const requested = requireText(req.body.memberId);
+  if (req.member.role === "admin") {
+    return requested || req.member.id;
+  }
+  if (requested && requested !== req.member.id) {
+    throw new HttpError(403, "You can only add entries for your own account.");
+  }
+  return req.member.id;
+}
+
+function countAdmins(store) {
+  return store.members.filter((member) => member.active !== false && member.role === "admin").length;
+}
 
 app.post("/api/session", async (req, res, next) => {
   try {
-    const store = await readStore();
     const mobile = normalizeMobile(req.body.mobile);
     const password = requireText(req.body.password);
+    const limitKey = `${req.ip}|${mobile}`;
 
     if (!mobile) {
       return res.status(400).json({ message: "Mobile number is required." });
     }
-
-    const member = findApprovedMemberByMobile(store, mobile);
-    if (!member) {
-      return res.status(403).json({ message: "Access is not approved for this mobile number." });
+    if (isLoginBlocked(limitKey)) {
+      return res.status(429).json({ message: "Too many failed attempts. Try again in 15 minutes." });
     }
 
-    if (!password || member.password !== password) {
+    const store = await readStore();
+    const member = findApprovedMemberByMobile(store, mobile);
+    if (!member || !(await verifyPassword(password, member.password))) {
+      recordLoginFailure(limitKey);
       return res.status(401).json({ message: "Mobile number or password is incorrect." });
     }
 
-    const sessionId = createSession(member.id);
-    setSessionCookie(res, sessionId);
+    loginFailures.delete(limitKey);
+    const token = await createSession(member.id);
+    setSessionCookie(req, res, token);
     res.json(await getState(member));
   } catch (error) {
     next(error);
   }
 });
 
-app.delete("/api/session", (req, res) => {
-  const sessionId = parseCookies(req.headers.cookie).sessionId;
-  clearSession(sessionId);
-  clearSessionCookie(res);
-  res.json({ ok: true });
+app.delete("/api/session", async (req, res, next) => {
+  try {
+    await clearSession(parseCookies(req.headers.cookie).sessionId);
+    clearSessionCookie(res);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/api/state", requireAuth, async (req, res, next) => {
@@ -210,6 +336,9 @@ app.post("/api/members", requireAuth, requireAdmin, async (req, res, next) => {
     if (!name || !mobile || !password) {
       return res.status(400).json({ message: "Member name, mobile number, and password are required." });
     }
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters." });
+    }
 
     const role = req.body.role === "admin" ? "admin" : "member";
     await updateStore((store) => {
@@ -217,10 +346,7 @@ app.post("/api/members", requireAuth, requireAdmin, async (req, res, next) => {
         (member) => member.active !== false && normalizeMobile(member.mobile) === mobile
       );
       if (existingMember) {
-        throw new Error("Mobile number already exists.");
-      }
-      if (role === "admin") {
-        store.members = store.members.map((member) => ({ ...member, role: "member" }));
+        throw new HttpError(409, "Mobile number already exists.");
       }
       const member = {
         id: nowId("member"),
@@ -229,10 +355,11 @@ app.post("/api/members", requireAuth, requireAdmin, async (req, res, next) => {
         active: true,
         mobile,
         approved: req.body.approved === false ? false : true,
-        password
+        password: hashPassword(password),
+        fixedAmount: 0,
+        openingBalance: 0
       };
       store.members.push(member);
-      store.mealCounts[member.id] = 0;
       return store;
     });
     res.status(201).json(await getState(req.member));
@@ -246,7 +373,7 @@ app.put("/api/members/:id/approval", requireAuth, requireAdmin, async (req, res,
     await updateStore((store) => {
       const member = findActiveMember(store, req.params.id);
       if (!member) {
-        throw new Error("Member not found.");
+        throw new HttpError(404, "Member not found.");
       }
       member.approved = req.body.approved !== false;
       return store;
@@ -257,10 +384,51 @@ app.put("/api/members/:id/approval", requireAuth, requireAdmin, async (req, res,
   }
 });
 
+app.put("/api/members/:id", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const name = requireText(req.body.name);
+    const mobile = normalizeMobile(req.body.mobile);
+    const password = requireText(req.body.password);
+    if (!name || !mobile) {
+      return res.status(400).json({ message: "Member name and mobile number are required." });
+    }
+    if (password && password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters." });
+    }
+
+    await updateStore((store) => {
+      const member = findActiveMember(store, req.params.id);
+      if (!member) {
+        throw new HttpError(404, "Member not found.");
+      }
+      const duplicate = store.members.find(
+        (item) => item.id !== member.id && item.active !== false && normalizeMobile(item.mobile) === mobile
+      );
+      if (duplicate) {
+        throw new HttpError(409, "Mobile number already exists.");
+      }
+      const role = req.body.role === "admin" ? "admin" : "member";
+      if (member.role === "admin" && role !== "admin" && countAdmins(store) <= 1) {
+        throw new HttpError(400, "The mess needs at least one admin.");
+      }
+      member.name = name;
+      member.mobile = mobile;
+      member.role = role;
+      if (password) {
+        member.password = hashPassword(password);
+      }
+      return store;
+    });
+    res.json(await getState(await getRequestMember(req)));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.delete("/api/members/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     if (req.params.id === req.member.id) {
-      return res.status(400).json({ message: "You cannot remove the current admin account." });
+      return res.status(400).json({ message: "You cannot remove your own admin account." });
     }
 
     await updateStore((store) => {
@@ -282,17 +450,16 @@ app.post("/api/bazar", requireAuth, async (req, res, next) => {
       return res.status(400).json({ message: "Bazar amount must be greater than 0." });
     }
 
+    const memberId = targetMemberId(req);
     await updateStore((store) => {
-      const memberId = req.member.role === "admin" ? req.body.memberId : req.member.id;
-      if (!findActiveMember(store, memberId)) {
-        throw new Error("Valid member is required.");
-      }
+      requireActiveMember(store, memberId);
       store.bazarEntries.push({
         id: nowId("bazar"),
         memberId,
         date: requireText(req.body.date, today()),
         description: requireText(req.body.description, "Bazar"),
-        amount
+        amount,
+        month: store.month
       });
       return store;
     });
@@ -302,16 +469,34 @@ app.post("/api/bazar", requireAuth, async (req, res, next) => {
   }
 });
 
-app.delete("/api/bazar/:id", requireAuth, async (req, res, next) => {
+// Members add their own bazar; the admin corrects (edits or removes) anyone's.
+app.put("/api/bazar/:id", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const amount = parseAmount(req.body.amount);
+    if (amount <= 0) {
+      return res.status(400).json({ message: "Bazar amount must be greater than 0." });
+    }
+
+    await updateStore((store) => {
+      const entry = requireOpenMonthEntry(store, store.bazarEntries, req.params.id, "Bazar entry");
+      const memberId = requireText(req.body.memberId, entry.memberId);
+      requireActiveMember(store, memberId);
+      entry.memberId = memberId;
+      entry.date = requireText(req.body.date, entry.date);
+      entry.description = requireText(req.body.description, "Bazar");
+      entry.amount = amount;
+      return store;
+    });
+    res.json(await getState(req.member));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/bazar/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     await updateStore((store) => {
-      const entry = store.bazarEntries.find((item) => item.id === req.params.id);
-      if (!entry) {
-        throw new Error("Bazar entry not found.");
-      }
-      if (!canManageMemberData(req.member, entry.memberId)) {
-        throw new Error("You can update only your own bazar list.");
-      }
+      requireOpenMonthEntry(store, store.bazarEntries, req.params.id, "Bazar entry");
       store.bazarEntries = store.bazarEntries.filter((item) => item.id !== req.params.id);
       return store;
     });
@@ -321,7 +506,8 @@ app.delete("/api/bazar/:id", requireAuth, async (req, res, next) => {
   }
 });
 
-app.put("/api/meals/:memberId", requireAuth, async (req, res, next) => {
+// Meal counts are kept by the admin only, so nobody can lower their own meal cost.
+app.put("/api/meals/:memberId", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const count = parseAmount(req.body.count);
     if (count < 0) {
@@ -329,10 +515,8 @@ app.put("/api/meals/:memberId", requireAuth, async (req, res, next) => {
     }
 
     await updateStore((store) => {
-      if (!findActiveMember(store, req.params.memberId)) {
-        throw new Error("Valid member is required.");
-      }
-      store.mealCounts[req.params.memberId] = count;
+      requireActiveMember(store, req.params.memberId);
+      store.meals[store.month] = { ...(store.meals[store.month] || {}), [req.params.memberId]: count };
       return store;
     });
     res.json(await getState(req.member));
@@ -341,29 +525,18 @@ app.put("/api/meals/:memberId", requireAuth, async (req, res, next) => {
   }
 });
 
-app.put("/api/my-house-rent", requireAuth, async (req, res, next) => {
+// A member's monthly fixed cost stays the same every month until the admin changes it.
+app.put("/api/members/:id/fixed-amount", requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const paidAmount = parseAmount(req.body.paidAmount);
-    const rentAmount = parseAmount(req.body.rentAmount);
-    const targetMemberId = req.member.role === "admin" ? requireText(req.body.memberId, req.member.id) : req.member.id;
-    if (paidAmount < 0 || rentAmount < 0) {
-      return res.status(400).json({ message: "House rent amounts cannot be negative." });
+    const amount = parseAmount(req.body.amount);
+    if (amount < 0) {
+      return res.status(400).json({ message: "Fixed amount cannot be negative." });
     }
 
     await updateStore((store) => {
-      const member = findActiveMember(store, targetMemberId);
-      if (!member) {
-        throw new Error("Valid member is required.");
-      }
-
-      if (req.member.role === "admin") {
-        member.rentAmount = rentAmount;
-      }
-      member.rentPaid = paidAmount;
-
+      requireActiveMember(store, req.params.id).fixedAmount = amount;
       return store;
     });
-
     res.json(await getState(req.member));
   } catch (error) {
     next(error);
@@ -378,16 +551,11 @@ app.post("/api/fixed-costs", requireAuth, requireAdmin, async (req, res, next) =
       return res.status(400).json({ message: "Fixed cost label and amount are required." });
     }
 
-    const splitType = req.body.splitType === "custom" ? "custom" : "equal";
-    const allocations = splitType === "custom" && req.body.allocations ? req.body.allocations : {};
-
     await updateStore((store) => {
       store.fixedCosts.push({
         id: nowId("fixed"),
         label,
-        amount,
-        splitType,
-        allocations
+        amount
       });
       return store;
     });
@@ -409,69 +577,27 @@ app.delete("/api/fixed-costs/:id", requireAuth, requireAdmin, async (req, res, n
   }
 });
 
-app.post("/api/individual-costs", requireAuth, async (req, res, next) => {
-  try {
-    const label = requireText(req.body.label);
-    const amount = parseAmount(req.body.amount);
-    if (!label || amount <= 0) {
-      return res.status(400).json({ message: "Individual cost label and amount are required." });
-    }
-
-    await updateStore((store) => {
-      const memberId = req.member.role === "admin" ? req.body.memberId : req.member.id;
-      if (!findActiveMember(store, memberId)) {
-        throw new Error("Valid member is required.");
-      }
-      store.individualCosts.push({
-        id: nowId("individual"),
-        memberId,
-        label,
-        amount
-      });
-      return store;
-    });
-    res.status(201).json(await getState(req.member));
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.delete("/api/individual-costs/:id", requireAuth, async (req, res, next) => {
-  try {
-    await updateStore((store) => {
-      const entry = store.individualCosts.find((item) => item.id === req.params.id);
-      if (!entry) {
-        throw new Error("Individual cost not found.");
-      }
-      if (!canManageMemberData(req.member, entry.memberId)) {
-        throw new Error("You can update only your own individual costs.");
-      }
-      store.individualCosts = store.individualCosts.filter((item) => item.id !== req.params.id);
-      return store;
-    });
-    res.json(await getState(req.member));
-  } catch (error) {
-    next(error);
-  }
-});
-
+// Each payment is its own entry, so paying twice adds up instead of overwriting.
+// "fixed" payments count toward the monthly fixed cost (rent & utility); "meal" ones toward meal cost.
 app.post("/api/payments", requireAuth, async (req, res, next) => {
   try {
     const amount = parseAmount(req.body.amount);
     if (amount <= 0) {
       return res.status(400).json({ message: "Payment amount must be greater than 0." });
     }
+    const kind = req.body.kind === "meal" ? "meal" : "fixed";
+    const memberId = targetMemberId(req);
 
     await updateStore((store) => {
-      if (!findActiveMember(store, req.body.memberId)) {
-        throw new Error("Valid member is required.");
-      }
+      requireActiveMember(store, memberId);
       store.payments.push({
         id: nowId("payment"),
-        memberId: req.body.memberId,
+        memberId,
         date: requireText(req.body.date, today()),
-        note: requireText(req.body.note, "Payment"),
-        amount
+        note: requireText(req.body.note, kind === "fixed" ? "Fixed cost payment" : "Meal cost payment"),
+        amount,
+        kind,
+        month: store.month
       });
       return store;
     });
@@ -481,9 +607,11 @@ app.post("/api/payments", requireAuth, async (req, res, next) => {
   }
 });
 
-app.delete("/api/payments/:id", requireAuth, async (req, res, next) => {
+// Only the admin removes payments, so a recorded payment cannot quietly disappear.
+app.delete("/api/payments/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     await updateStore((store) => {
+      requireOpenMonthEntry(store, store.payments, req.params.id, "Payment");
       store.payments = store.payments.filter((entry) => entry.id !== req.params.id);
       return store;
     });
@@ -493,20 +621,65 @@ app.delete("/api/payments/:id", requireAuth, async (req, res, next) => {
   }
 });
 
+app.put("/api/settings", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const messName = requireText(req.body.messName);
+    if (!messName) {
+      return res.status(400).json({ message: "Mess name is required." });
+    }
+    await updateStore((store) => {
+      store.settings = { ...store.settings, messName: messName.slice(0, 80) };
+      return store;
+    });
+    res.json(await getState(req.member));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/month/close", requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    await updateStore(startNextMonth);
+    res.json(await getState(req.member));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/reset", requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    await writeStore(sampleStore());
-    res.json(await getState(findApprovedMemberByMobile(await readStore(), req.member.mobile)));
+    const store = await resetStore();
+    const viewer = findApprovedMemberByMobile(store, req.member.mobile);
+    if (!viewer) {
+      clearSessionCookie(res);
+      return res.json({ viewer: null });
+    }
+    res.json(await getState(viewer));
   } catch (error) {
     next(error);
   }
 });
 
 app.use((error, req, res, next) => {
-  console.error(error);
-  res.status(500).json({ message: "Something went wrong.", detail: error.message });
+  const status = error.status || error.statusCode || 500;
+  if (status >= 500) {
+    console.error(error);
+  }
+  res.status(status).json({ message: status < 500 ? error.message : "Something went wrong." });
 });
 
-app.listen(PORT, () => {
-  console.log(`Sweet Home Expense Manager running at http://localhost:${PORT}`);
-});
+async function start() {
+  await initStore();
+  app.listen(PORT, () => {
+    console.log(`Sweet Home Expense Manager running at http://localhost:${PORT} (storage: ${backend.name})`);
+  });
+}
+
+if (require.main === module) {
+  start().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
+
+module.exports = { app, initStore };

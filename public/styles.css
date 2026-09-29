@@ -175,7 +175,8 @@ h2 {
 }
 
 #adminShell,
-#userShell {
+#memberShell,
+.view {
   display: grid;
   gap: 20px;
 }
@@ -290,8 +291,7 @@ h2 {
   width: 100%;
 }
 
-.report-panel,
-.settlement-panel {
+.report-panel {
   background: var(--surface-strong);
 }
 
@@ -534,8 +534,7 @@ tbody tr:last-child td {
   padding-right: 4px;
 }
 
-.member-item,
-.settlement-item {
+.member-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -569,22 +568,6 @@ tbody tr:last-child td {
   text-transform: uppercase;
 }
 
-.settlement-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.settlement-item {
-  align-items: flex-start;
-  display: grid;
-}
-
-.settlement-item strong {
-  color: var(--amber);
-  font-size: 20px;
-}
-
 .empty {
   color: var(--muted);
   padding: 18px;
@@ -615,7 +598,6 @@ tbody tr:last-child td {
 @media (max-width: 1080px) {
   .metric-grid,
   .workspace,
-  .settlement-list,
   .split-panels {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -644,7 +626,6 @@ tbody tr:last-child td {
 
   .metric-grid,
   .workspace,
-  .settlement-list,
   .form-grid,
   .split-panels,
   .allocation-fields {
@@ -676,4 +657,180 @@ tbody tr:last-child td {
   .metric {
     min-height: 96px;
   }
+}
+
+.fixed-check {
+  margin-bottom: 12px;
+}
+
+.fixed-check.warning {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.member-picker {
+  margin-bottom: 12px;
+}
+
+.meal-input {
+  width: 80px;
+  min-height: 34px;
+  text-align: right;
+}
+
+.history-item summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.history-item table {
+  margin-top: 10px;
+}
+
+/* ---------- role dashboards ---------- */
+
+.topbar-month {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 700;
+}
+
+.form-grid.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metric-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.row-actions.left {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.settings-note {
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.summary-row.total {
+  border-top: 2px solid var(--line);
+}
+
+tr.is-me td {
+  background: #effaf4;
+}
+
+/* ---------- member status ---------- */
+
+.status-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-top: 5px solid var(--green);
+}
+
+.status-amount {
+  display: block;
+  margin: 4px 0 6px;
+  font-size: clamp(32px, 6vw, 48px);
+  line-height: 1.05;
+}
+
+.status-amount.owes {
+  color: var(--red);
+}
+
+.status-amount.advance {
+  color: var(--green);
+}
+
+.quick-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 6px;
+  background: var(--green);
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.button-link:hover {
+  filter: brightness(0.95);
+}
+
+@media (max-width: 720px) {
+  .form-grid.two-col,
+  .metric-grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-actions,
+  .button-link {
+    width: 100%;
+  }
+
+  .button-link {
+    justify-content: center;
+  }
+}
+
+/* ---------- accounting tables ---------- */
+
+.due {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.credit {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.total-cell {
+  font-size: 15px;
+}
+
+tfoot th {
+  border-top: 2px solid var(--line);
+  background: #f7f4ec;
+}
+
+.subheading {
+  margin: 22px 0 6px;
+  font-size: 16px;
+}
+
+.table-note {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.rate-label {
+  color: var(--green);
+}
+
+.status-hero .muted .due,
+.status-hero .muted .credit {
+  font-weight: 800;
+}
+
+.summary-row.sub {
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.summary-row.sub strong {
+  font-weight: 600;
 }

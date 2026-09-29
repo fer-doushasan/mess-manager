@@ -16,12 +16,14 @@
             <path d="M18 24h12" />
           </svg>
         </div>
-        <h1>Sweet Home Expense Manager</h1>
+        <div>
+          <h1 id="messName">Sweet Home Expense Manager</h1>
+          <p id="currentMonthLabel" class="topbar-month"></p>
+        </div>
       </div>
       <div class="topbar-actions">
         <button id="loginBtn" class="ghost-button" type="button">Login</button>
         <div id="viewerBadge" class="viewer-badge hidden"></div>
-        <button id="resetBtn" class="ghost-button hidden" type="button">Reset sample</button>
         <button id="logoutBtn" class="ghost-button hidden" type="button">Logout</button>
       </div>
     </header>
@@ -41,7 +43,7 @@
               Mobile number
               <input id="loginMobile" name="mobile" type="tel" placeholder="01700000000" required>
             </label>
-            <label id="passwordField">
+            <label>
               Password
               <input name="password" type="password" placeholder="Password" required>
             </label>
@@ -53,176 +55,26 @@
         </div>
       </section>
 
-      <div id="adminShell">
-      <section class="metric-grid" aria-label="Monthly summary">
-        <article class="metric">
-          <span>Month</span>
-          <strong id="currentMonthYear">-</strong>
-        </article>
-        <article class="metric">
-          <span>Monthly fixed cost</span>
-          <strong id="fixedCostTotal">BDT: 0</strong>
-        </article>
-        <article class="metric">
-          <span>Total deposits</span>
-          <strong id="otherPaidTotal">BDT: 0</strong>
-        </article>
-        <article class="metric">
-          <span>Total due</span>
-          <strong id="netBalance">BDT: 0</strong>
-        </article>
-        <article class="metric">
-          <span>Total bazar cost</span>
-          <strong id="totalBazar">BDT: 0</strong>
-        </article>
-        <article class="metric">
-          <span>Total meals</span>
-          <strong id="totalMeals">0</strong>
-        </article>
-        <article class="metric">
-          <span>Meal rate</span>
-          <strong id="mealRate">BDT: 0</strong>
-        </article>
-        <article class="metric">
-          <span>Remaining balance</span>
-          <strong id="remainingBalance">BDT: 0</strong>
-        </article>
-      </section>
+      <!-- ================= ADMIN ================= -->
+      <div id="adminShell" class="shell hidden">
+        <section class="metric-grid" aria-label="Monthly mess summary">
+          <article class="metric"><span>Members</span><strong id="adminMembers">0</strong></article>
+          <article class="metric"><span>Total bazar</span><strong id="totalBazar">BDT: 0</strong></article>
+          <article class="metric"><span>Total meals</span><strong id="totalMeals">0</strong></article>
+          <article class="metric accent"><span>Meal rate</span><strong id="mealRate">BDT: 0</strong></article>
+          <article class="metric"><span>Total fixed cost</span><strong id="fixedAssignedTotal">BDT: 0</strong></article>
+          <article class="metric"><span>Total payments</span><strong id="paymentsTotal">BDT: 0</strong></article>
+          <article class="metric"><span>Fixed cost due</span><strong id="fixedDueTotal">BDT: 0</strong></article>
+          <article class="metric"><span>Total outstanding</span><strong id="dueTotal">BDT: 0</strong></article>
+        </section>
 
-      <div class="panel admin-panel">
-        <div class="section-heading">
-          <div>
-            <h2>Fixed cost</h2>
-          </div>
-        </div>
-        <div id="mandatoryAdminControls" class="hidden">
-          <form id="fixedCostForm" class="mandatory-form">
-            <div id="fixedCostRows" class="mandatory-list"></div>
-            <div id="allocationFields" class="allocation-fields"></div>
-            <div class="mandatory-actions">
-              <button type="button" id="addFixedCostRow" class="soft-button">+ Add cost</button>
-              <button type="submit" class="mandatory-save">Save</button>
-            </div>
-          </form>
-        </div>
-        <div id="mandatoryReadOnly" class="hidden">
-          <div id="fixedCostReadOnly" class="mandatory-list"></div>
-        </div>
-      </div>
-
-      <div class="split-panels">
-        <div class="panel half-panel">
+        <div class="panel" id="members">
           <div class="section-heading">
-            <div>
-              <h2>House Rent & Utility</h2>
-            </div>
+            <h2 id="memberFormTitle">Members</h2>
+            <button id="cancelMemberEdit" class="ghost-button hidden" type="button">Cancel edit</button>
           </div>
-          <form id="houseRentForm" class="form-grid">
-            <label id="houseRentMemberField" class="wide hidden">
-              User
-              <select name="memberId" id="houseRentMemberSelect" data-member-select></select>
-            </label>
-            <label id="houseRentSetField" class="hidden">
-              Due Amount
-              <input name="rentAmount" type="number" min="0" step="0.01" placeholder="0">
-            </label>
-            <label>
-              Paid Amount
-              <input name="paidAmount" type="number" min="0" step="0.01" placeholder="0">
-            </label>
-            <button type="submit">Save</button>
-          </form>
-          <div id="houseRentSummary" class="empty">Log in to set your house rent.</div>
-        </div>
-
-        <div class="panel half-panel">
-          <div class="section-heading">
-            <div>
-              <h2>House Rent & Utility Pending</h2>
-            </div>
-          </div>
-          <div id="houseRentPendingList" class="member-list"></div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">User input</p>
-            <h2>Bazar cost</h2>
-          </div>
-        </div>
-        <form id="bazarForm" class="form-grid">
-          <label id="bazarMemberField">
-            User
-            <select name="memberId" data-member-select></select>
-          </label>
-          <div id="bazarOwnerSummary" class="bazar-owner hidden"></div>
-          <label>
-            Date
-            <input name="date" type="date">
-          </label>
-          <label class="wide">
-            List
-            <input name="description" type="text" placeholder="Rice, dal, vegetables">
-          </label>
-          <label>
-            Amount
-            <input name="amount" type="number" min="1" step="0.01" required>
-          </label>
-          <button type="submit">Add bazar</button>
-        </form>
-        <div class="table-wrap compact">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>User</th>
-                <th>List</th>
-                <th>Amount</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="bazarRows"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <section class="panel report-panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Final report</p>
-            <h2>Member balances</h2>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th>Meals</th>
-                <th>Meal cost</th>
-                <th>Fixed</th>
-                <th>Individual</th>
-                <th>Payable</th>
-                <th>Paid</th>
-                <th>Balance</th>
-              </tr>
-            </thead>
-            <tbody id="reportRows"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="workspace">
-
-        <div class="panel">
-          <div class="section-heading">
-            <div>
-              <h2>Members</h2>
-            </div>
-          </div>
-          <form id="memberForm" class="form-grid hidden">
+          <form id="memberForm" class="form-grid">
+            <input name="id" type="hidden">
             <label>
               Name
               <input name="name" type="text" placeholder="Ferdous" required>
@@ -233,122 +85,319 @@
             </label>
             <label>
               Password
-              <input name="password" type="password" placeholder="Temporary password" required>
+              <input name="password" type="password" placeholder="At least 6 characters">
             </label>
-            <button type="submit">Add member</button>
+            <label>
+              Role
+              <select name="role">
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <button type="submit">Save member</button>
           </form>
           <div id="memberList" class="member-list"></div>
         </div>
 
-      </section>
+        <div class="panel" id="bazar">
+          <div class="section-heading">
+            <h2 id="bazarFormTitle">Bazar</h2>
+            <button id="cancelBazarEdit" class="ghost-button hidden" type="button">Cancel edit</button>
+          </div>
+          <form id="bazarForm" class="form-grid">
+            <input name="id" type="hidden">
+            <label>
+              Member
+              <select name="memberId" data-member-select></select>
+            </label>
+            <label>
+              Date
+              <input name="date" type="date">
+            </label>
+            <label>
+              Amount
+              <input name="amount" type="number" min="1" step="0.01" required>
+            </label>
+            <label class="wide">
+              List
+              <input name="description" type="text" placeholder="Rice, dal, vegetables">
+            </label>
+            <button type="submit">Save bazar</button>
+          </form>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Member</th><th>List</th><th class="number">Amount</th><th></th></tr>
+              </thead>
+              <tbody id="bazarRows"></tbody>
+            </table>
+          </div>
+        </div>
 
-      </div>
-
-      <div id="userShell" class="hidden">
-        <section class="panel user-hero">
+        <div class="panel" id="meals">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">User dashboard</p>
-              <h2 id="userWelcome">My dashboard</h2>
+              <h2>Meals</h2>
+              <p class="muted">Only the admin enters meals. Changes save when you leave the box.</p>
             </div>
-            <div id="userRoleNote" class="muted"></div>
           </div>
-        </section>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr><th>Member</th><th class="number">Meals</th><th class="number">Meal cost</th></tr>
+              </thead>
+              <tbody id="mealRows"></tbody>
+            </table>
+          </div>
+        </div>
 
-        <section class="metric-grid" aria-label="My summary">
-          <article class="metric">
-            <span>My balance</span>
-            <strong id="userBalance">BDT: 0</strong>
-          </article>
-          <article class="metric">
-            <span>My payable</span>
-            <strong id="userPayable">BDT: 0</strong>
-          </article>
-          <article class="metric accent">
-            <span>My paid</span>
-            <strong id="userPaid">BDT: 0</strong>
-          </article>
-          <article class="metric">
-            <span>My meal cost</span>
-            <strong id="userMealCost">BDT: 0</strong>
-          </article>
-        </section>
+        <div class="panel admin-panel" id="fixed-costs">
+          <div class="section-heading">
+            <div>
+              <h2>Fixed costs</h2>
+              <p class="muted">Each person's monthly fixed cost (rent &amp; utilities). It carries over every month until you change it.</p>
+            </div>
+          </div>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr><th>Member</th><th class="number">Fixed cost</th><th class="number">Paid</th><th class="number">Due</th></tr>
+              </thead>
+              <tbody id="fixedRows"></tbody>
+              <tfoot id="fixedFoot"></tfoot>
+            </table>
+          </div>
+          <h3 class="subheading">House bills</h3>
+          <p class="muted">The house's total bills, for checking that everyone's fixed costs add up to them.</p>
+          <div id="fixedCostCheck" class="muted fixed-check"></div>
+          <form id="fixedCostForm" class="mandatory-form">
+            <div id="fixedCostRows" class="mandatory-list"></div>
+            <div class="mandatory-actions">
+              <button type="button" id="addFixedCostRow" class="soft-button">+ Add bill</button>
+              <button type="submit" class="mandatory-save">Save bills</button>
+            </div>
+          </form>
+        </div>
 
-        <section class="workspace">
+        <div class="panel" id="payments">
+          <div class="section-heading">
+            <h2>Payments</h2>
+          </div>
+          <form id="adminPaymentForm" class="form-grid">
+            <label>
+              Member
+              <select name="memberId" data-member-select></select>
+            </label>
+            <label>
+              Type
+              <select name="kind">
+                <option value="fixed">Fixed cost (rent &amp; utility)</option>
+                <option value="meal">Meal cost</option>
+              </select>
+            </label>
+            <label>
+              Date
+              <input name="date" type="date">
+            </label>
+            <label>
+              Amount
+              <input name="amount" type="number" min="1" step="0.01" required>
+            </label>
+            <button type="submit">Add payment</button>
+          </form>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Member</th><th>Type</th><th>Note</th><th class="number">Amount</th><th></th></tr>
+              </thead>
+              <tbody id="paymentRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel report-panel">
+          <div class="section-heading">
+            <h2>Meal calculation</h2>
+            <strong id="adminMealRateLabel" class="rate-label"></strong>
+          </div>
+          <div id="adminMealTable" class="table-wrap"></div>
+        </div>
+
+        <div class="panel report-panel">
+          <div class="section-heading">
+            <h2>Monthly settlement</h2>
+          </div>
+          <div id="adminSettlementTable" class="table-wrap"></div>
+        </div>
+
+        <div class="panel" id="history">
+          <div class="section-heading">
+            <h2>Previous months</h2>
+          </div>
+          <div id="historyList" class="member-list"></div>
+        </div>
+
+        <div class="split-panels" id="settings">
           <div class="panel">
             <div class="section-heading">
-              <div>
-                <p class="eyebrow">My cost</p>
-                <h2>House rent</h2>
-              </div>
+              <h2>Mess settings</h2>
             </div>
-            <form id="userHouseRentForm" class="form-grid">
-              <label>
-                Amount
-                <input name="amount" type="number" min="0" step="0.01" placeholder="0">
-              </label>
-              <button type="submit">Save house rent</button>
-            </form>
-            <div id="userHouseRentSummary" class="empty">Login to set your house rent.</div>
-          </div>
-
-          <div class="panel">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">My input</p>
-                <h2>My bazar list</h2>
-              </div>
-            </div>
-            <form id="userBazarForm" class="form-grid">
-              <label>
-                Date
-                <input name="date" type="date">
-              </label>
+            <form id="settingsForm" class="form-grid two-col">
               <label class="wide">
-                List
-                <input name="description" type="text" placeholder="Rice, dal, vegetables">
+                Mess name
+                <input name="messName" type="text" maxlength="80" required>
               </label>
-              <label>
-                Amount
-                <input name="amount" type="number" min="1" step="0.01" required>
-              </label>
-              <button type="submit">Add my bazar</button>
+              <button type="submit">Save</button>
             </form>
+          </div>
+          <div class="panel">
+            <div class="section-heading">
+              <h2>Month</h2>
+            </div>
+            <p class="muted settings-note">
+              Closing the month keeps all of its data under Previous months and starts the next month.
+              Fixed costs stay; each person's total due or credit carries over.
+            </p>
+            <div class="row-actions left">
+              <button id="closeMonthBtn" type="button">Start next month</button>
+              <button id="resetBtn" class="ghost-button danger" type="button">Reset all data</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= MEMBER ================= -->
+      <div id="memberShell" class="shell hidden">
+        <section class="panel status-hero">
+          <div>
+            <p class="eyebrow">My total due</p>
+            <strong id="userBalance" class="status-amount">-</strong>
+            <p id="userBalanceNote" class="muted"></p>
+          </div>
+          <div class="quick-actions">
+            <a class="button-link" href="#my-bazar" data-focus="userBazarForm">+ Add Bazar</a>
+            <a class="button-link" href="#my-payments" data-focus="userPaymentForm">+ Add Payment</a>
+          </div>
+        </section>
+
+        <div class="split-panels">
+          <div class="panel">
+            <div class="section-heading">
+              <h2>Fixed cost</h2>
+            </div>
+            <div id="userFixedSummary" class="summary-list"></div>
+          </div>
+          <div class="panel">
+            <div class="section-heading">
+              <h2>Meal</h2>
+            </div>
+            <div id="userMealSummary" class="summary-list"></div>
+          </div>
+        </div>
+
+        <div class="panel" id="my-bazar">
+          <div class="section-heading">
+            <h2>My bazar</h2>
+            <strong id="userBazarTotal"></strong>
+          </div>
+          <form id="userBazarForm" class="form-grid">
+            <label>
+              Date
+              <input name="date" type="date">
+            </label>
+            <label>
+              Amount
+              <input name="amount" type="number" min="1" step="0.01" required>
+            </label>
+            <label class="wide">
+              List
+              <input name="description" type="text" placeholder="Rice, dal, vegetables">
+            </label>
+            <button type="submit">Add bazar</button>
+          </form>
+          <p class="muted">Entered something by mistake? Ask the admin to correct it.</p>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>List</th><th class="number">Amount</th></tr>
+              </thead>
+              <tbody id="userBazarRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel" id="my-payments">
+          <div class="section-heading">
+            <h2>My payments</h2>
+            <strong id="userPaymentTotal"></strong>
+          </div>
+          <form id="userPaymentForm" class="form-grid">
+            <label>
+              Type
+              <select name="kind">
+                <option value="fixed">Fixed cost (rent &amp; utility)</option>
+                <option value="meal">Meal cost</option>
+              </select>
+            </label>
+            <label>
+              Date
+              <input name="date" type="date">
+            </label>
+            <label>
+              Amount
+              <input name="amount" type="number" min="1" step="0.01" required>
+            </label>
+            <button type="submit">Add payment</button>
+          </form>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Type</th><th>Note</th><th class="number">Amount</th></tr>
+              </thead>
+              <tbody id="userPaymentRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel report-panel">
+          <div class="section-heading">
+            <h2>Meal calculation</h2>
+            <strong id="memberMealRateLabel" class="rate-label"></strong>
+          </div>
+          <div id="memberMealTable" class="table-wrap"></div>
+        </div>
+
+        <div class="panel report-panel">
+          <div class="section-heading">
+            <h2>Monthly settlement</h2>
+          </div>
+          <div id="memberSettlementTable" class="table-wrap"></div>
+        </div>
+
+        <div class="panel">
+          <div class="section-heading">
+            <h2>Bazar summary</h2>
+          </div>
+          <div class="split-panels">
             <div class="table-wrap compact">
               <table>
                 <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>List</th>
-                    <th>Amount</th>
-                    <th></th>
-                  </tr>
+                  <tr><th>Member</th><th class="number">Total bazar</th></tr>
                 </thead>
-                <tbody id="userBazarRows"></tbody>
+                <tbody id="bazarSummaryRows"></tbody>
+                <tfoot id="bazarSummaryFoot"></tfoot>
+              </table>
+            </div>
+            <div class="table-wrap compact">
+              <table>
+                <thead>
+                  <tr><th>Date</th><th>Member</th><th>List</th><th class="number">Amount</th></tr>
+                </thead>
+                <tbody id="overviewBazarRows"></tbody>
               </table>
             </div>
           </div>
-
-          <div class="panel">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">My account</p>
-                <h2>My summary</h2>
-              </div>
-            </div>
-            <div id="userAccountSummary" class="summary-list"></div>
-          </div>
-
-          <div class="panel">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Status</p>
-                <h2>Settlement</h2>
-              </div>
-            </div>
-            <div id="userSettlementSummary" class="empty">Login to view your settlement status.</div>
-          </div>
-        </section>
+        </div>
       </div>
     </main>
 

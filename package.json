@@ -5,8 +5,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node src/server.js",
-    "test": "node --test"
+    "dev": "node --env-file-if-exists=.env src/server.js",
+    "test": "node --test",
+    "import-json": "node --env-file-if-exists=.env scripts/import-json.js"
   },
   "keywords": [
     "mess-management",
@@ -16,6 +17,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "pg": "^8.23.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

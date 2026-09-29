@@ -1,66 +1,83 @@
+// Role-based UI. The server decides what each role may see and do; hiding things
+// here is only for a cleaner experience, never for security. All numbers come from
+// the server's calculator; nothing is recalculated here.
+const $ = (selector) => document.querySelector(selector);
+
 const elements = {
-  adminShell: document.querySelector("#adminShell"),
-  userShell: document.querySelector("#userShell"),
-  loginPanel: document.querySelector("#loginPanel"),
-  loginBtn: document.querySelector("#loginBtn"),
-  closeLoginBtn: document.querySelector("#closeLoginBtn"),
-  loginMobile: document.querySelector("#loginMobile"),
-  passwordField: document.querySelector("#passwordField"),
-  viewerBadge: document.querySelector("#viewerBadge"),
-  logoutBtn: document.querySelector("#logoutBtn"),
-  resetBtn: document.querySelector("#resetBtn"),
-  currentMonthYear: document.querySelector("#currentMonthYear"),
-  totalBazar: document.querySelector("#totalBazar"),
-  totalMeals: document.querySelector("#totalMeals"),
-  mealRate: document.querySelector("#mealRate"),
-  remainingBalance: document.querySelector("#remainingBalance"),
-  fixedCostTotal: document.querySelector("#fixedCostTotal"),
-  otherPaidTotal: document.querySelector("#otherPaidTotal"),
-  netBalance: document.querySelector("#netBalance"),
-  reportRows: document.querySelector("#reportRows"),
-  memberList: document.querySelector("#memberList"),
-  bazarRows: document.querySelector("#bazarRows"),
-  bazarMemberField: document.querySelector("#bazarMemberField"),
-  bazarOwnerSummary: document.querySelector("#bazarOwnerSummary"),
-  fixedCostRows: document.querySelector("#fixedCostRows"),
-  fixedCostReadOnly: document.querySelector("#fixedCostReadOnly"),
-  houseRentMemberField: document.querySelector("#houseRentMemberField"),
-  houseRentMemberSelect: document.querySelector("#houseRentMemberSelect"),
-  houseRentSetField: document.querySelector("#houseRentSetField"),
-  houseRentSummary: document.querySelector("#houseRentSummary"),
-  houseRentPendingList: document.querySelector("#houseRentPendingList"),
-  userWelcome: document.querySelector("#userWelcome"),
-  userRoleNote: document.querySelector("#userRoleNote"),
-  userBalance: document.querySelector("#userBalance"),
-  userPayable: document.querySelector("#userPayable"),
-  userPaid: document.querySelector("#userPaid"),
-  userMealCost: document.querySelector("#userMealCost"),
-  userHouseRentSummary: document.querySelector("#userHouseRentSummary"),
-  userBazarRows: document.querySelector("#userBazarRows"),
-  userAccountSummary: document.querySelector("#userAccountSummary"),
-  userSettlementSummary: document.querySelector("#userSettlementSummary"),
-  allocationFields: document.querySelector("#allocationFields"),
-  mandatoryAdminControls: document.querySelector("#mandatoryAdminControls"),
-  mandatoryReadOnly: document.querySelector("#mandatoryReadOnly"),
-  addFixedCostRow: document.querySelector("#addFixedCostRow"),
-  toast: document.querySelector("#toast")
+  adminShell: $("#adminShell"),
+  memberShell: $("#memberShell"),
+  loginPanel: $("#loginPanel"),
+  loginBtn: $("#loginBtn"),
+  closeLoginBtn: $("#closeLoginBtn"),
+  loginMobile: $("#loginMobile"),
+  viewerBadge: $("#viewerBadge"),
+  logoutBtn: $("#logoutBtn"),
+  messName: $("#messName"),
+  currentMonthLabel: $("#currentMonthLabel"),
+  toast: $("#toast"),
+
+  // admin
+  adminMembers: $("#adminMembers"),
+  totalBazar: $("#totalBazar"),
+  totalMeals: $("#totalMeals"),
+  mealRate: $("#mealRate"),
+  fixedAssignedTotal: $("#fixedAssignedTotal"),
+  paymentsTotal: $("#paymentsTotal"),
+  fixedDueTotal: $("#fixedDueTotal"),
+  dueTotal: $("#dueTotal"),
+  memberFormTitle: $("#memberFormTitle"),
+  cancelMemberEdit: $("#cancelMemberEdit"),
+  memberList: $("#memberList"),
+  bazarFormTitle: $("#bazarFormTitle"),
+  cancelBazarEdit: $("#cancelBazarEdit"),
+  bazarRows: $("#bazarRows"),
+  mealRows: $("#mealRows"),
+  fixedRows: $("#fixedRows"),
+  fixedFoot: $("#fixedFoot"),
+  fixedCostCheck: $("#fixedCostCheck"),
+  fixedCostRows: $("#fixedCostRows"),
+  addFixedCostRow: $("#addFixedCostRow"),
+  paymentRows: $("#paymentRows"),
+  adminMealRateLabel: $("#adminMealRateLabel"),
+  adminMealTable: $("#adminMealTable"),
+  adminSettlementTable: $("#adminSettlementTable"),
+  historyList: $("#historyList"),
+  closeMonthBtn: $("#closeMonthBtn"),
+  resetBtn: $("#resetBtn"),
+
+  // member
+  userBalance: $("#userBalance"),
+  userBalanceNote: $("#userBalanceNote"),
+  userFixedSummary: $("#userFixedSummary"),
+  userMealSummary: $("#userMealSummary"),
+  userBazarTotal: $("#userBazarTotal"),
+  userBazarRows: $("#userBazarRows"),
+  userPaymentTotal: $("#userPaymentTotal"),
+  userPaymentRows: $("#userPaymentRows"),
+  memberMealRateLabel: $("#memberMealRateLabel"),
+  memberMealTable: $("#memberMealTable"),
+  memberSettlementTable: $("#memberSettlementTable"),
+  bazarSummaryRows: $("#bazarSummaryRows"),
+  bazarSummaryFoot: $("#bazarSummaryFoot"),
+  overviewBazarRows: $("#overviewBazarRows")
 };
 
 const forms = {
-  login: document.querySelector("#loginForm"),
-  member: document.querySelector("#memberForm"),
-  bazar: document.querySelector("#bazarForm"),
-  fixedCost: document.querySelector("#fixedCostForm"),
-  houseRent: document.querySelector("#houseRentForm"),
-  userHouseRent: document.querySelector("#userHouseRentForm"),
-  userBazar: document.querySelector("#userBazarForm")
+  login: $("#loginForm"),
+  member: $("#memberForm"),
+  bazar: $("#bazarForm"),
+  fixedCost: $("#fixedCostForm"),
+  adminPayment: $("#adminPaymentForm"),
+  settings: $("#settingsForm"),
+  userBazar: $("#userBazarForm"),
+  userPayment: $("#userPaymentForm")
 };
 
 let state = null;
-let loginMembers = [];
 let toastTimer = null;
 let fixedCostDraft = [];
-let selectedHouseRentMemberId = "";
+
+// ---------- helpers ----------
 
 function money(value) {
   const amount = Number(value || 0);
@@ -78,6 +95,18 @@ function number(value) {
   });
 }
 
+// Positive = due, negative = credit. Always shown with a word so the sign is never ambiguous.
+function signed(value, { due = "due", credit = "credit" } = {}) {
+  const amount = Number(value || 0);
+  if (amount > 0) {
+    return `<span class="due">${money(amount)} ${due}</span>`;
+  }
+  if (amount < 0) {
+    return `<span class="credit">${money(-amount)} ${credit}</span>`;
+  }
+  return `<span class="muted">${money(0)}</span>`;
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -87,7 +116,6 @@ function formatMonthYear(value) {
   if (!match) {
     return String(value || "-");
   }
-
   const [, year, month] = match;
   const date = new Date(Number(year), Number(month) - 1, 1);
   return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(date);
@@ -102,12 +130,29 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function normalizeMobile(value) {
-  return String(value || "").replace(/\D/g, "");
+function paymentKindLabel(kind) {
+  return kind === "fixed" ? "Fixed cost" : "Meal cost";
 }
 
-function activeMembers() {
-  return state.store.members.filter((member) => member.active !== false);
+function emptyRow(columns, text) {
+  return `<tr><td colspan="${columns}" class="muted">${escapeHtml(text)}</td></tr>`;
+}
+
+function summaryRows(rows) {
+  return rows
+    .map(
+      ([label, value, style]) => `
+        <div class="summary-row${style === "sub" ? " sub" : style ? " total" : ""}">
+          <span>${escapeHtml(label)}</span>
+          <strong>${value}</strong>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function sumOf(rows, field) {
+  return rows.reduce((total, row) => total + Number(row[field] || 0), 0);
 }
 
 function currentViewer() {
@@ -118,53 +163,119 @@ function isAdmin() {
   return currentViewer()?.role === "admin";
 }
 
-function findLoginMemberByMobile(mobile) {
-  const normalizedMobile = normalizeMobile(mobile);
-  return loginMembers.find((member) => normalizeMobile(member.mobile) === normalizedMobile) || null;
+function activeMembers() {
+  return isAdmin() ? state.store.members.filter((member) => member.active !== false) : [];
 }
 
 function memberName(memberId) {
   return state.store.members.find((member) => member.id === memberId)?.name || "Unknown";
 }
 
-function currentHouseRentEntry() {
-  if (!currentViewer()) {
-    return null;
-  }
-  const memberId = isAdmin() ? selectedHouseRentMemberId || currentViewer().id : currentViewer().id;
-  const member = activeMembers().find((item) => item.id === memberId) || null;
-  return member
-    ? {
-        memberId,
-        rentAmount: Number(member.rentAmount || 0),
-        rentPaid: Number(member.rentPaid || 0)
-      }
-    : null;
+function inOpenMonth(entries) {
+  return entries.filter((entry) => entry.month === state.month);
 }
 
-function focusFixedCostRow(index) {
-  const input = elements.fixedCostRows.querySelector(`[data-fixed-label="${index}"]`);
-  if (!input) {
-    return;
-  }
-  input.focus();
-  input.select();
+// ---------- shared tables (admin and member see the same numbers) ----------
+
+function nameCell(row, meId) {
+  return `<strong>${escapeHtml(row.name)}</strong>${row.memberId === meId ? ' <span class="muted">(you)</span>' : ""}`;
 }
 
-function currentReportRow() {
-  if (!currentViewer()) {
-    return null;
+function mealTable(rows, summary, meId) {
+  if (!rows.length) {
+    return '<div class="empty">No members yet.</div>';
   }
-  return state.report.rows.find((row) => row.memberId === currentViewer().id) || null;
+  const body = rows
+    .map(
+      (row) => `
+        <tr class="${row.memberId === meId ? "is-me" : ""}">
+          <td>${nameCell(row, meId)}</td>
+          <td class="number">${number(row.mealCount)}</td>
+          <td class="number">${money(row.mealCost)}</td>
+          <td class="number">${money(row.bazarPaid)}</td>
+          <td class="number">${money(row.mealPaid)}</td>
+          <td class="number">${money(row.mealTotalPaid)}</td>
+          <td class="number">${signed(row.mealBalance)}</td>
+        </tr>
+      `
+    )
+    .join("");
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Member</th><th class="number">Meals</th><th class="number">Meal cost</th>
+          <th class="number">Bazar</th><th class="number">Cash</th><th class="number">Meal paid</th>
+          <th class="number">Meal balance</th>
+        </tr>
+      </thead>
+      <tbody>${body}</tbody>
+      <tfoot>
+        <tr>
+          <th>Total</th>
+          <th class="number">${number(summary.totalMeals)}</th>
+          <th class="number">${money(summary.totalMealCost ?? sumOf(rows, "mealCost"))}</th>
+          <th class="number">${money(summary.totalBazarCost)}</th>
+          <th class="number">${money(sumOf(rows, "mealPaid"))}</th>
+          <th class="number">${money(sumOf(rows, "mealTotalPaid"))}</th>
+          <th class="number">${signed(sumOf(rows, "mealBalance"))}</th>
+        </tr>
+      </tfoot>
+    </table>
+    <p class="muted table-note">Meal paid = bazar + cash meal payments. Meal balance = meal cost − meal paid; credit means the person paid more than they ate.</p>
+  `;
 }
 
-function currentHouseRentMember() {
-  if (!currentViewer()) {
-    return null;
+function settlementTable(rows, meId) {
+  if (!rows.length) {
+    return '<div class="empty">No members yet.</div>';
   }
-  const memberId = isAdmin() ? selectedHouseRentMemberId || currentViewer().id : currentViewer().id;
-  return activeMembers().find((member) => member.id === memberId) || null;
+  const hasPrevious = rows.some((row) => row.previousBalance);
+  const body = rows
+    .map(
+      (row) => `
+        <tr class="${row.memberId === meId ? "is-me" : ""}">
+          <td>${nameCell(row, meId)}</td>
+          <td class="number">${money(row.bazarPaid)}</td>
+          <td class="number">${number(row.mealCount)}</td>
+          <td class="number">${money(row.mealCost)}</td>
+          <td class="number">${signed(row.mealBalance)}</td>
+          <td class="number">${signed(row.fixedBalance, { credit: "advance" })}</td>
+          ${hasPrevious ? `<td class="number">${signed(row.previousBalance)}</td>` : ""}
+          <td class="number total-cell">${signed(row.balance, { credit: "to get back" })}</td>
+        </tr>
+      `
+    )
+    .join("");
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Member</th><th class="number">Bazar</th><th class="number">Meals</th><th class="number">Meal cost</th>
+          <th class="number">Meal due</th><th class="number">Fixed due</th>
+          ${hasPrevious ? '<th class="number">Last month</th>' : ""}
+          <th class="number">Total due</th>
+        </tr>
+      </thead>
+      <tbody>${body}</tbody>
+      <tfoot>
+        <tr>
+          <th>Total</th>
+          <th class="number">${money(sumOf(rows, "bazarPaid"))}</th>
+          <th class="number">${number(sumOf(rows, "mealCount"))}</th>
+          <th class="number">${money(sumOf(rows, "mealCost"))}</th>
+          <th class="number">${signed(sumOf(rows, "mealBalance"))}</th>
+          <th class="number">${signed(sumOf(rows, "fixedBalance"), { credit: "advance" })}</th>
+          ${hasPrevious ? `<th class="number">${signed(sumOf(rows, "previousBalance"))}</th>` : ""}
+          <th class="number">${signed(sumOf(rows, "balance"), { credit: "to get back" })}</th>
+        </tr>
+      </tfoot>
+    </table>
+    <p class="muted table-note">Total due = meal due + fixed due${hasPrevious ? " + last month" : ""}. A credit reduces what the person owes.</p>
+  `;
 }
+
+// ---------- network ----------
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -180,9 +291,8 @@ async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    if (response.status === 401) {
-      state = null;
-      renderShell();
+    if (response.status === 401 && path !== "/api/session") {
+      showLoggedOut();
     }
     throw new Error(data?.message || "Request failed.");
   }
@@ -192,9 +302,13 @@ async function request(path, options = {}) {
 
 async function api(path, options = {}) {
   const data = await request(path, options);
-  if (data?.store && data?.report) {
-    state = data;
-    render();
+  if (data && "viewer" in data) {
+    if (!data.viewer) {
+      showLoggedOut();
+    } else {
+      state = data;
+      render();
+    }
   }
   return data;
 }
@@ -218,29 +332,34 @@ function resetForm(form) {
   renderMemberSelects();
 }
 
-function setFixedCostDraftFromState() {
-  fixedCostDraft = state.report.fixedCosts.map((entry) => ({
-    id: entry.id,
-    label: entry.label,
-    amount: entry.amount
-  }));
-  fixedCostDraft.push({ id: "", label: "", amount: "" });
+async function handleSubmit(form, path, buildPayload, successMessage, method = "POST") {
+  try {
+    await api(path, { method, body: JSON.stringify(buildPayload(formData(form))) });
+    resetForm(form);
+    showToast(successMessage);
+    return true;
+  } catch (error) {
+    showToast(error.message);
+    return false;
+  }
 }
 
+// ---------- rendering ----------
+
 function renderShell() {
-  const loggedIn = Boolean(state?.viewer);
+  const loggedIn = Boolean(currentViewer());
   elements.loginBtn.classList.toggle("hidden", loggedIn);
   elements.viewerBadge.classList.toggle("hidden", !loggedIn);
   elements.logoutBtn.classList.toggle("hidden", !loggedIn);
-  elements.resetBtn.classList.toggle("hidden", !loggedIn || !isAdmin());
-  elements.adminShell.classList.remove("hidden");
-  elements.userShell.classList.add("hidden");
+  elements.adminShell.classList.toggle("hidden", !loggedIn || !isAdmin());
+  elements.memberShell.classList.toggle("hidden", !loggedIn || isAdmin());
 
   if (loggedIn) {
     elements.viewerBadge.textContent = `${currentViewer().name} (${currentViewer().role})`;
     elements.loginPanel.classList.add("hidden");
   } else {
     elements.viewerBadge.textContent = "";
+    elements.currentMonthLabel.textContent = "";
   }
 }
 
@@ -249,31 +368,47 @@ function render() {
   if (!state) {
     return;
   }
-  renderSummary();
-  renderMemberSelects();
-  renderReport();
-  renderMembers();
-  renderBazar();
-  renderFixedCosts();
-  renderHouseRent();
-  renderUserDashboard();
+  const messName = state.settings?.messName || "Sweet Home";
+  elements.messName.textContent = `${messName} Expense Manager`;
+  document.title = `${messName} Expense Manager`;
+  elements.currentMonthLabel.textContent = formatMonthYear(state.month);
+
+  if (isAdmin()) {
+    renderAdmin();
+  } else {
+    renderMember();
+  }
 }
 
-function renderSummary() {
-  const summary = state.report.summary;
-  const remainingBalance = money(summary.rentPaidTotal - summary.fixedCostTotal);
-  elements.currentMonthYear.textContent = formatMonthYear(state.store.month);
+// ---------- admin ----------
+
+function renderAdmin() {
+  const { summary, rows } = state.report;
+  elements.adminMembers.textContent = number(summary.totalMembers);
   elements.totalBazar.textContent = money(summary.totalBazarCost);
   elements.totalMeals.textContent = number(summary.totalMeals);
   elements.mealRate.textContent = money(summary.mealRate);
-  elements.remainingBalance.textContent = remainingBalance;
-  elements.fixedCostTotal.textContent = money(summary.fixedCostTotal);
-  elements.otherPaidTotal.textContent = money(summary.rentPaidTotal);
-  elements.netBalance.textContent = money(summary.dueTotal);
+  elements.fixedAssignedTotal.textContent = money(summary.fixedAssignedTotal);
+  elements.paymentsTotal.textContent = money(summary.paymentsTotal);
+  elements.fixedDueTotal.textContent = money(summary.fixedDueTotal);
+  elements.dueTotal.textContent = money(summary.dueTotal);
+
+  renderMemberSelects();
+  renderMembers();
+  renderBazar();
+  renderMeals();
+  renderFixedCosts();
+  renderPayments();
+
+  elements.adminMealRateLabel.textContent = `Meal rate: ${money(summary.mealRate)}`;
+  elements.adminMealTable.innerHTML = mealTable(rows, summary);
+  elements.adminSettlementTable.innerHTML = settlementTable(rows);
+  renderHistory();
+  renderSettings();
 }
 
 function renderMemberSelects() {
-  if (!state) {
+  if (!isAdmin()) {
     return;
   }
   const members = activeMembers().filter((member) => member.approved !== false);
@@ -288,65 +423,31 @@ function renderMemberSelects() {
       select.value = previous;
     }
   });
-
-  if (currentViewer() && !isAdmin()) {
-    const select = forms.bazar.querySelector("[name='memberId']");
-    if (select) {
-      select.value = currentViewer().id;
-    }
-  }
-
-  if (isAdmin()) {
-    if (!selectedHouseRentMemberId || !members.some((member) => member.id === selectedHouseRentMemberId)) {
-      selectedHouseRentMemberId = currentViewer()?.id || members[0]?.id || "";
-    }
-    if (elements.houseRentMemberSelect) {
-      elements.houseRentMemberSelect.value = selectedHouseRentMemberId;
-    }
-  }
 }
 
-function renderReport() {
-  elements.reportRows.innerHTML = state.report.rows
-    .map((row) => {
-      const balanceLabel =
-        row.balance > 0 ? `Owes ${money(row.balance)}` : row.balance < 0 ? `Will get ${money(Math.abs(row.balance))}` : "Settled";
-      return `
-        <tr>
-          <td>
-            <strong>${escapeHtml(row.name)}</strong>
-            <div class="role">${escapeHtml(row.role)}</div>
-          </td>
-          <td class="number">${number(row.mealCount)}</td>
-          <td class="number">${money(row.mealCost)}</td>
-          <td class="number">${money(row.fixedCost)}</td>
-          <td class="number">${money(row.individualCost)}</td>
-          <td class="number">${money(row.totalPayable)}</td>
-          <td class="number">${money(row.totalPaid)}</td>
-          <td><span class="pill ${row.status}">${balanceLabel}</span></td>
-        </tr>
-      `;
-    })
-    .join("");
+function resetMemberForm() {
+  forms.member.reset();
+  forms.member.elements.id.value = "";
+  forms.member.elements.password.placeholder = "At least 6 characters";
+  elements.memberFormTitle.textContent = "Members";
+  elements.cancelMemberEdit.classList.add("hidden");
 }
 
 function renderMembers() {
-  forms.member.classList.toggle("hidden", !isAdmin());
-  const members = activeMembers();
-  elements.memberList.innerHTML = members
+  elements.memberList.innerHTML = activeMembers()
     .map((member) => {
-      const actions = [];
-      if (isAdmin()) {
-        if (member.id !== currentViewer().id) {
-          if (member.approved === false) {
-            actions.push(
-              `<button class="ghost-button" type="button" data-approve-member="${escapeHtml(member.id)}">Approve</button>`
-            );
-          }
+      const actions = [
+        `<button class="ghost-button" type="button" data-edit-member="${escapeHtml(member.id)}">Edit</button>`
+      ];
+      if (member.id !== currentViewer().id) {
+        if (member.approved === false) {
           actions.push(
-            `<button class="link-button danger" type="button" data-delete="members" data-id="${escapeHtml(member.id)}">Remove</button>`
+            `<button class="ghost-button" type="button" data-approve-member="${escapeHtml(member.id)}">Approve</button>`
           );
         }
+        actions.push(
+          `<button class="link-button danger" type="button" data-delete="members" data-id="${escapeHtml(member.id)}">Remove</button>`
+        );
       }
 
       return `
@@ -363,349 +464,316 @@ function renderMembers() {
     .join("");
 }
 
-function renderBazar() {
-  const loggedIn = Boolean(currentViewer());
-  const memberSelect = forms.bazar.querySelector("[name='memberId']");
-  elements.bazarMemberField.classList.toggle("hidden", loggedIn && !isAdmin());
-  elements.bazarOwnerSummary.classList.toggle("hidden", !(loggedIn && !isAdmin()));
-  if (loggedIn && !isAdmin()) {
-    elements.bazarOwnerSummary.textContent = `Adding bazar for ${currentViewer().name}`;
-    memberSelect.value = currentViewer().id;
-  }
+function resetBazarForm() {
+  resetForm(forms.bazar);
+  forms.bazar.elements.id.value = "";
+  elements.bazarFormTitle.textContent = "Bazar";
+  elements.cancelBazarEdit.classList.add("hidden");
+}
 
-  elements.bazarRows.innerHTML = state.store.bazarEntries
+function renderBazar() {
+  const entries = inOpenMonth(state.store.bazarEntries);
+  elements.bazarRows.innerHTML = entries.length
+    ? entries
+        .map(
+          (entry) => `
+            <tr>
+              <td>${escapeHtml(entry.date || "")}</td>
+              <td>${escapeHtml(memberName(entry.memberId))}</td>
+              <td>${escapeHtml(entry.description || "Bazar")}</td>
+              <td class="number">${money(entry.amount)}</td>
+              <td class="row-actions">
+                <button class="link-button" type="button" data-edit-bazar="${escapeHtml(entry.id)}">Edit</button>
+                <button class="link-button danger" type="button" data-delete="bazar" data-id="${escapeHtml(entry.id)}">Delete</button>
+              </td>
+            </tr>
+          `
+        )
+        .join("")
+    : emptyRow(5, "No bazar yet this month.");
+}
+
+function renderMeals() {
+  elements.mealRows.innerHTML = state.report.rows
     .map(
-      (entry) => `
+      (row) => `
         <tr>
-          <td>${escapeHtml(entry.date || "")}</td>
-          <td>${escapeHtml(memberName(entry.memberId))}</td>
-          <td>${escapeHtml(entry.description || "Bazar")}</td>
-          <td class="number">${money(entry.amount)}</td>
-          <td>${
-            currentViewer() && (isAdmin() || entry.memberId === currentViewer().id)
-              ? `<button class="link-button danger" type="button" data-delete="bazar" data-id="${escapeHtml(entry.id)}">Delete</button>`
-              : ""
-          }</td>
+          <td><strong>${escapeHtml(row.name)}</strong></td>
+          <td class="number">
+            <input class="meal-input" type="number" min="0" step="0.5" value="${escapeHtml(row.mealCount)}"
+              data-meal-member="${escapeHtml(row.memberId)}" aria-label="Meals for ${escapeHtml(row.name)}">
+          </td>
+          <td class="number">${money(row.mealCost)}</td>
         </tr>
       `
     )
     .join("");
+}
+
+function setFixedCostDraftFromState() {
+  fixedCostDraft = state.report.fixedCosts.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    amount: entry.amount
+  }));
+  fixedCostDraft.push({ id: "", label: "", amount: "" });
+}
+
+function focusFixedCostRow(index) {
+  const input = elements.fixedCostRows.querySelector(`[data-fixed-label="${index}"]`);
+  if (input) {
+    input.focus();
+    input.select();
+  }
 }
 
 function renderFixedCosts() {
-  elements.mandatoryAdminControls.classList.toggle("hidden", !isAdmin());
-  elements.mandatoryReadOnly.classList.toggle("hidden", isAdmin());
-
-  if (isAdmin()) {
-    if (!fixedCostDraft.length) {
-      setFixedCostDraftFromState();
-    }
-    elements.fixedCostRows.innerHTML = fixedCostDraft
-      .map(
-        (entry, index) => `
-          <div class="mandatory-row">
-            <input data-fixed-label="${index}" type="text" placeholder="Title" value="${escapeHtml(entry.label)}">
-            <input data-fixed-amount="${index}" type="number" min="0" step="0.01" placeholder="Amount" value="${escapeHtml(entry.amount)}">
-            <button class="mandatory-remove" type="button" data-remove-fixed-row="${index}" aria-label="Remove cost">x</button>
-          </div>
-        `
-      )
-      .join("");
-    return;
-  }
-
-  elements.fixedCostReadOnly.innerHTML = state.report.fixedCosts
+  const { rows, summary } = state.report;
+  elements.fixedRows.innerHTML = rows
     .map(
-      (entry) => `
-        <div class="mandatory-readonly-row">
-          <div>
-            <strong>${escapeHtml(entry.label)}</strong>
-          </div>
-          <div class="number">${money(entry.amount)}</div>
-        </div>
-      `
-    )
-    .join("");
-}
-
-function renderHouseRent() {
-  const viewer = currentViewer();
-  const targetMember = currentHouseRentMember();
-  const entry = currentHouseRentEntry();
-  const setInput = forms.houseRent.querySelector("[name='rentAmount']");
-  const paidInput = forms.houseRent.querySelector("[name='paidAmount']");
-  forms.houseRent.classList.toggle("hidden", !viewer);
-  elements.houseRentMemberField.classList.toggle("hidden", !isAdmin());
-  elements.houseRentSetField.classList.toggle("hidden", !viewer);
-
-  if (!viewer) {
-    elements.houseRentSummary.textContent = "Log in to set your house rent.";
-    return;
-  }
-
-  setInput.disabled = !isAdmin();
-  setInput.readOnly = !isAdmin();
-  setInput.value = entry ? entry.rentAmount : "";
-  paidInput.value = entry ? entry.rentPaid : "";
-  const dueAmount = Math.max(0, Number(entry?.rentAmount || 0) - Number(entry?.rentPaid || 0));
-  elements.houseRentSummary.textContent =
-    `${targetMember?.name || viewer.name} | Paid: ${money(entry?.rentPaid || 0)} | Due: ${money(dueAmount)}`;
-
-  const rentStatusMembers = activeMembers();
-  if (!rentStatusMembers.length) {
-    elements.houseRentPendingList.innerHTML = '<div class="empty">No members found.</div>';
-    return;
-  }
-
-  elements.houseRentPendingList.innerHTML = rentStatusMembers
-    .map(
-      (member) => {
-        const rentAmount = Number(member.rentAmount || 0);
-        const rentPaid = Number(member.rentPaid || 0);
-        const dueAmount = Math.max(0, rentAmount - rentPaid);
-        let statusLabel = "Not set";
-
-        if (rentAmount > 0 && dueAmount > 0) {
-          statusLabel = `Due: ${money(dueAmount)}`;
-        } else if (rentAmount > 0) {
-          statusLabel = "Paid";
-        }
-
-        return `
-        <div class="member-item compact-item">
-          <div>
-            <div class="member-name">${escapeHtml(member.name)}</div>
-            <div class="role">${escapeHtml(member.mobile || "")}</div>
-          </div>
-          <div class="muted">${statusLabel}</div>
-        </div>
-      `;
-      }
-    )
-    .join("");
-}
-
-function renderUserDashboard() {
-  const viewer = currentViewer();
-  const row = currentReportRow();
-  const rentEntry = currentHouseRentEntry();
-
-  if (!viewer || !row || isAdmin()) {
-    return;
-  }
-
-  elements.userWelcome.textContent = `${viewer.name}'s dashboard`;
-  elements.userRoleNote.textContent = viewer.mobile;
-  elements.userBalance.textContent =
-    row.balance > 0 ? money(row.balance) : row.balance < 0 ? `Advance ${money(Math.abs(row.balance))}` : "Settled";
-  elements.userPayable.textContent = money(row.totalPayable);
-  elements.userPaid.textContent = money(row.totalPaid);
-  elements.userMealCost.textContent = money(row.mealCost);
-
-  const userHouseRentInput = forms.userHouseRent.querySelector("[name='amount']");
-  userHouseRentInput.value = rentEntry ? rentEntry.rentPaid : "";
-  const userRentDue = Math.max(0, Number(rentEntry?.rentAmount || 0) - Number(rentEntry?.rentPaid || 0));
-  elements.userHouseRentSummary.textContent = rentEntry
-    ? `Paid: ${money(rentEntry.rentPaid)} | Due: ${money(userRentDue)}`
-    : "No house rent saved yet.";
-
-  const myBazarEntries = state.store.bazarEntries.filter((entry) => entry.memberId === viewer.id);
-  elements.userBazarRows.innerHTML = myBazarEntries
-    .map(
-      (entry) => `
+      (row) => `
         <tr>
-          <td>${escapeHtml(entry.date || "")}</td>
-          <td>${escapeHtml(entry.description || "Bazar")}</td>
-          <td class="number">${money(entry.amount)}</td>
-          <td><button class="link-button danger" type="button" data-delete="bazar" data-id="${escapeHtml(entry.id)}">Delete</button></td>
+          <td><strong>${escapeHtml(row.name)}</strong></td>
+          <td class="number">
+            <input class="meal-input fixed-input" type="number" min="0" step="0.01" value="${escapeHtml(row.fixedCost)}"
+              data-fixed-member="${escapeHtml(row.memberId)}" aria-label="Fixed cost for ${escapeHtml(row.name)}">
+          </td>
+          <td class="number">${money(row.fixedPaid)}</td>
+          <td class="number">${signed(row.fixedBalance, { credit: "advance" })}</td>
         </tr>
       `
     )
     .join("");
+  elements.fixedFoot.innerHTML = `
+    <tr>
+      <th>Total</th>
+      <th class="number">${money(summary.fixedAssignedTotal)}</th>
+      <th class="number">${money(summary.fixedPaidTotal)}</th>
+      <th class="number">${money(summary.fixedDueTotal)} due</th>
+    </tr>
+  `;
 
-  elements.userAccountSummary.innerHTML = [
-    ["Meals", number(row.mealCount)],
-    ["Fixed cost share", money(row.fixedCost)],
-    ["Other individual costs", money(row.individualCost)],
-    ["Bazar paid", money(row.bazarPaid)],
-    ["Other paid", money(row.otherPaid)]
-  ]
+  const difference = summary.fixedAssignedTotal - summary.fixedCostTotal;
+  elements.fixedCostCheck.classList.toggle("warning", difference !== 0);
+  elements.fixedCostCheck.textContent =
+    `Bills total ${money(summary.fixedCostTotal)} | Everyone's fixed costs ${money(summary.fixedAssignedTotal)}` +
+    (difference === 0 ? " | Matches" : difference > 0 ? ` | ${money(difference)} more than bills` : ` | ${money(-difference)} not assigned yet`);
+
+  if (!fixedCostDraft.length) {
+    setFixedCostDraftFromState();
+  }
+  elements.fixedCostRows.innerHTML = fixedCostDraft
     .map(
-      ([label, value]) => `
-        <div class="summary-row">
-          <span>${escapeHtml(label)}</span>
-          <strong>${escapeHtml(value)}</strong>
+      (entry, index) => `
+        <div class="mandatory-row">
+          <input data-fixed-label="${index}" type="text" placeholder="House rent, Internet, Gas…" value="${escapeHtml(entry.label)}">
+          <input data-fixed-amount="${index}" type="number" min="0" step="0.01" placeholder="Amount" value="${escapeHtml(entry.amount)}">
+          <button class="mandatory-remove" type="button" data-remove-fixed-row="${index}" aria-label="Remove bill">x</button>
         </div>
       `
     )
     .join("");
-
-  elements.userSettlementSummary.textContent =
-    row.balance > 0
-      ? `You still need to pay ${money(row.balance)}.`
-      : row.balance < 0
-        ? `You have an advance of ${money(Math.abs(row.balance))}.`
-        : "Your account is settled.";
 }
 
-async function refreshLoginOptions() {
-  const data = await request("/api/session/options");
-  loginMembers = data.members || [];
+function renderPayments() {
+  const payments = inOpenMonth(state.store.payments);
+  elements.paymentRows.innerHTML = payments.length
+    ? payments
+        .map(
+          (payment) => `
+            <tr>
+              <td>${escapeHtml(payment.date || "")}</td>
+              <td>${escapeHtml(memberName(payment.memberId))}</td>
+              <td>${paymentKindLabel(payment.kind)}</td>
+              <td>${escapeHtml(payment.note || "")}</td>
+              <td class="number">${money(payment.amount)}</td>
+              <td><button class="link-button danger" type="button" data-delete="payments" data-id="${escapeHtml(payment.id)}">Delete</button></td>
+            </tr>
+          `
+        )
+        .join("")
+    : emptyRow(6, "No payments yet this month.");
 }
 
-async function loadPublicState() {
-  state = await request("/api/public-state");
-  render();
+function renderHistory() {
+  const months = (state.previousMonths || []).filter((entry) => entry.report);
+  elements.historyList.innerHTML = months.length
+    ? months
+        .map(
+          ({ month, report }) => `
+            <details class="history-item">
+              <summary>
+                ${escapeHtml(formatMonthYear(month))}: bazar ${money(report.summary.totalBazarCost)},
+                meals ${number(report.summary.totalMeals)}, meal rate ${money(report.summary.mealRate)},
+                outstanding ${money(report.summary.dueTotal)}
+              </summary>
+              <h3 class="subheading">Meal calculation</h3>
+              <div class="table-wrap">${mealTable(report.rows, report.summary)}</div>
+              <h3 class="subheading">Monthly settlement</h3>
+              <div class="table-wrap">${settlementTable(report.rows)}</div>
+            </details>
+          `
+        )
+        .join("")
+    : '<div class="empty">No closed months yet. Close a month from the Month panel below.</div>';
+}
+
+function renderSettings() {
+  const input = forms.settings.elements.messName;
+  if (document.activeElement !== input) {
+    input.value = state.settings?.messName || "";
+  }
+  elements.closeMonthBtn.textContent = `Close ${formatMonthYear(state.month)} & start next month`;
 }
 
 async function syncMandatoryCosts() {
   const rows = fixedCostDraft
     .map((entry) => ({
-      id: entry.id,
       label: String(entry.label || "").trim(),
       amount: Number(entry.amount || 0)
     }))
     .filter((entry) => entry.label && entry.amount > 0);
 
-  const existingIds = state.report.fixedCosts.map((entry) => entry.id);
-  for (const id of existingIds) {
-    await api(`/api/fixed-costs/${encodeURIComponent(id)}`, { method: "DELETE" });
+  for (const entry of state.report.fixedCosts) {
+    await api(`/api/fixed-costs/${encodeURIComponent(entry.id)}`, { method: "DELETE" });
   }
-
   for (const row of rows) {
-    await api("/api/fixed-costs", {
-      method: "POST",
-      body: JSON.stringify({
-        label: row.label,
-        amount: row.amount,
-        splitType: "equal",
-        allocations: {}
-      })
-    });
+    await api("/api/fixed-costs", { method: "POST", body: JSON.stringify(row) });
   }
 
   setFixedCostDraftFromState();
+  renderFixedCosts();
 }
 
-async function handleSubmit(form, path, buildPayload, successMessage) {
-  try {
-    const payload = buildPayload(formData(form));
-    await api(path, {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-    resetForm(form);
-    showToast(successMessage);
-  } catch (error) {
-    showToast(error.message);
+// ---------- member ----------
+
+function renderMember() {
+  const me = state.me;
+  if (!me) {
+    return;
   }
+  const { summary } = state;
+
+  // My total due, always with its parts.
+  elements.userBalance.innerHTML =
+    me.balance > 0 ? money(me.balance) : me.balance < 0 ? `${money(-me.balance)} to get back` : "Nothing due";
+  elements.userBalance.className = `status-amount ${me.status}`;
+  const parts = [`Fixed cost ${signed(me.fixedBalance, { credit: "advance" })}`, `Meal ${signed(me.mealBalance)}`];
+  if (me.previousBalance) {
+    parts.push(`Last month ${signed(me.previousBalance)}`);
+  }
+  elements.userBalanceNote.innerHTML = parts.join(" + ");
+
+  elements.userFixedSummary.innerHTML = summaryRows([
+    ["Fixed cost this month", money(me.fixedCost)],
+    ["Paid", money(me.fixedPaid)],
+    ["Due", signed(me.fixedBalance, { credit: "advance" }), true]
+  ]);
+  elements.userMealSummary.innerHTML = summaryRows([
+    ["Meals", number(me.mealCount)],
+    ["Meal rate", money(summary.mealRate)],
+    ["Meal cost", money(me.mealCost)],
+    ["Meal paid", `− ${money(me.mealTotalPaid)}`],
+    ["from my bazar", money(me.bazarPaid), "sub"],
+    ["from cash payments", money(me.mealPaid), "sub"],
+    ["Meal balance", signed(me.mealBalance), true]
+  ]);
+
+  // My bazar
+  const myBazar = state.bazarEntries.filter((entry) => entry.memberId === me.memberId);
+  elements.userBazarTotal.textContent = money(me.bazarPaid);
+  elements.userBazarRows.innerHTML = myBazar.length
+    ? myBazar
+        .map(
+          (entry) => `
+            <tr>
+              <td>${escapeHtml(entry.date || "")}</td>
+              <td>${escapeHtml(entry.description || "Bazar")}</td>
+              <td class="number">${money(entry.amount)}</td>
+            </tr>
+          `
+        )
+        .join("")
+    : emptyRow(3, "You have not added any bazar this month.");
+
+  // My payments
+  elements.userPaymentTotal.textContent = money(me.fixedPaid + me.mealPaid);
+  elements.userPaymentRows.innerHTML = state.payments.length
+    ? state.payments
+        .map(
+          (payment) => `
+            <tr>
+              <td>${escapeHtml(payment.date || "")}</td>
+              <td>${paymentKindLabel(payment.kind)}</td>
+              <td>${escapeHtml(payment.note || "")}</td>
+              <td class="number">${money(payment.amount)}</td>
+            </tr>
+          `
+        )
+        .join("")
+    : emptyRow(4, "No payments this month.");
+
+  // Shared tables
+  elements.memberMealRateLabel.textContent = `Meal rate: ${money(summary.mealRate)}`;
+  elements.memberMealTable.innerHTML = mealTable(state.members, summary, me.memberId);
+  elements.memberSettlementTable.innerHTML = settlementTable(state.members, me.memberId);
+
+  elements.bazarSummaryRows.innerHTML = state.members
+    .map(
+      (row) => `
+        <tr class="${row.memberId === me.memberId ? "is-me" : ""}">
+          <td>${nameCell(row, me.memberId)}</td>
+          <td class="number">${money(row.bazarPaid)}</td>
+        </tr>
+      `
+    )
+    .join("");
+  elements.bazarSummaryFoot.innerHTML = `<tr><th>Total</th><th class="number">${money(summary.totalBazarCost)}</th></tr>`;
+  elements.overviewBazarRows.innerHTML = state.bazarEntries.length
+    ? state.bazarEntries
+        .map(
+          (entry) => `
+            <tr>
+              <td>${escapeHtml(entry.date || "")}</td>
+              <td>${escapeHtml(entry.memberName || "")}</td>
+              <td>${escapeHtml(entry.description || "Bazar")}</td>
+              <td class="number">${money(entry.amount)}</td>
+            </tr>
+          `
+        )
+        .join("")
+    : emptyRow(4, "No bazar yet this month.");
+}
+
+// ---------- session ----------
+
+function showLoggedOut() {
+  state = null;
+  fixedCostDraft = [];
+  resetMemberForm();
+  renderShell();
+  elements.loginPanel.classList.remove("hidden");
+  elements.loginMobile.focus();
 }
 
 forms.login.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
+    fixedCostDraft = [];
     await api("/api/session", {
       method: "POST",
       body: JSON.stringify(formData(forms.login))
     });
-    if (isAdmin()) {
-      setFixedCostDraftFromState();
-    }
     forms.login.reset();
-    elements.loginPanel.classList.add("hidden");
     showToast("Logged in.");
   } catch (error) {
     showToast(error.message);
   }
 });
 
-forms.member.addEventListener("submit", (event) => {
-  event.preventDefault();
-  handleSubmit(
-    forms.member,
-    "/api/members",
-    (data) => ({ ...data, role: "member", approved: false }),
-    "Member added. Waiting for approval."
-  );
-});
-
-forms.bazar.addEventListener("submit", (event) => {
-  event.preventDefault();
-  handleSubmit(
-    forms.bazar,
-    "/api/bazar",
-    (data) => ({ ...data, memberId: isAdmin() ? data.memberId : currentViewer()?.id }),
-    "Bazar entry added."
-  );
-});
-
-forms.fixedCost.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  try {
-    await syncMandatoryCosts();
-    showToast("Mandatory costs updated.");
-  } catch (error) {
-    showToast(error.message);
-  }
-});
-
-forms.houseRent.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  try {
-    await api("/api/my-house-rent", {
-      method: "PUT",
-      body: JSON.stringify({
-        ...formData(forms.houseRent),
-        memberId: isAdmin() ? selectedHouseRentMemberId : currentViewer()?.id
-      })
-    });
-    showToast("House rent updated.");
-  } catch (error) {
-    showToast(error.message);
-  }
-});
-
-forms.userHouseRent.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  try {
-    await api("/api/my-house-rent", {
-      method: "PUT",
-      body: JSON.stringify({
-        paidAmount: formData(forms.userHouseRent).amount,
-        memberId: currentViewer()?.id
-      })
-    });
-    showToast("House rent updated.");
-  } catch (error) {
-    showToast(error.message);
-  }
-});
-
-elements.houseRentMemberSelect?.addEventListener("change", () => {
-  selectedHouseRentMemberId = elements.houseRentMemberSelect.value;
-  renderHouseRent();
-});
-
-forms.userBazar.addEventListener("submit", (event) => {
-  event.preventDefault();
-  handleSubmit(
-    forms.userBazar,
-    "/api/bazar",
-    (data) => ({ ...data, memberId: currentViewer()?.id }),
-    "Bazar entry added."
-  );
-});
-
-elements.addFixedCostRow.addEventListener("click", () => {
-  fixedCostDraft.push({ id: "", label: "", amount: "" });
-  renderFixedCosts();
-  focusFixedCostRow(fixedCostDraft.length - 1);
-});
-
-elements.loginBtn.addEventListener("click", async () => {
+elements.loginBtn.addEventListener("click", () => {
   elements.loginPanel.classList.toggle("hidden");
   if (!elements.loginPanel.classList.contains("hidden")) {
-    await refreshLoginOptions();
     elements.loginMobile.focus();
   }
 });
@@ -720,24 +788,123 @@ elements.logoutBtn.addEventListener("click", async () => {
   } catch (error) {
     showToast(error.message);
   }
-  await loadPublicState();
-  fixedCostDraft = [];
-  renderShell();
+  showLoggedOut();
   showToast("Logged out.");
 });
 
-elements.resetBtn.addEventListener("click", async () => {
+// ---------- admin actions ----------
+
+forms.member.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = formData(forms.member);
+  const payload = { name: data.name, mobile: data.mobile, password: data.password, role: data.role };
+  if (data.id) {
+    handleSubmit(forms.member, `/api/members/${encodeURIComponent(data.id)}`, () => payload, "Member updated.", "PUT").then(
+      (saved) => saved && resetMemberForm()
+    );
+    return;
+  }
+  if (!data.password) {
+    showToast("Password is required for a new member.");
+    return;
+  }
+  handleSubmit(forms.member, "/api/members", () => ({ ...payload, approved: false }), "Member added. Approve to allow login.");
+});
+
+elements.cancelMemberEdit.addEventListener("click", resetMemberForm);
+
+forms.bazar.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = formData(forms.bazar);
+  if (data.id) {
+    handleSubmit(forms.bazar, `/api/bazar/${encodeURIComponent(data.id)}`, () => data, "Bazar updated.", "PUT").then(
+      (saved) => saved && resetBazarForm()
+    );
+    return;
+  }
+  handleSubmit(forms.bazar, "/api/bazar", () => data, "Bazar entry added.");
+});
+
+elements.cancelBazarEdit.addEventListener("click", resetBazarForm);
+
+forms.adminPayment.addEventListener("submit", (event) => {
+  event.preventDefault();
+  handleSubmit(forms.adminPayment, "/api/payments", (data) => data, "Payment added.");
+});
+
+forms.fixedCost.addEventListener("submit", async (event) => {
+  event.preventDefault();
   try {
-    await api("/api/reset", { method: "POST", body: "{}" });
-    if (isAdmin()) {
-      setFixedCostDraftFromState();
-    }
-    await refreshLoginOptions();
-    showToast("Sample data restored.");
+    await syncMandatoryCosts();
+    showToast("House bills updated.");
   } catch (error) {
     showToast(error.message);
   }
 });
+
+elements.addFixedCostRow.addEventListener("click", () => {
+  fixedCostDraft.push({ id: "", label: "", amount: "" });
+  renderFixedCosts();
+  focusFixedCostRow(fixedCostDraft.length - 1);
+});
+
+forms.settings.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await api("/api/settings", { method: "PUT", body: JSON.stringify(formData(forms.settings)) });
+    showToast("Settings saved.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+elements.closeMonthBtn.addEventListener("click", async () => {
+  const month = formatMonthYear(state.month);
+  if (
+    !window.confirm(
+      `Close ${month}? It stays under Previous months; each person's total due or credit carries over to next month.`
+    )
+  ) {
+    return;
+  }
+  try {
+    await api("/api/month/close", { method: "POST", body: "{}" });
+    showToast(`${month} closed.`);
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+elements.resetBtn.addEventListener("click", async () => {
+  if (
+    !window.confirm(
+      "Reset deletes all bazar, meals, payments and previous months. Members, logins, house bills and fixed costs are kept. Continue?"
+    )
+  ) {
+    return;
+  }
+  try {
+    fixedCostDraft = [];
+    await api("/api/reset", { method: "POST", body: "{}" });
+    showToast("Data reset.");
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
+// ---------- member actions ----------
+
+forms.userBazar.addEventListener("submit", (event) => {
+  event.preventDefault();
+  handleSubmit(forms.userBazar, "/api/bazar", (data) => data, "Bazar entry added.");
+});
+
+forms.userPayment.addEventListener("submit", (event) => {
+  event.preventDefault();
+  handleSubmit(forms.userPayment, "/api/payments", (data) => data, "Payment added.");
+});
+
+// ---------- delegated events ----------
 
 document.addEventListener("input", (event) => {
   const labelInput = event.target.closest("[data-fixed-label]");
@@ -751,20 +918,78 @@ document.addEventListener("input", (event) => {
   }
 });
 
+document.addEventListener("change", async (event) => {
+  const mealInput = event.target.closest("[data-meal-member]");
+  const fixedInput = event.target.closest("[data-fixed-member]");
+  try {
+    if (mealInput) {
+      await api(`/api/meals/${encodeURIComponent(mealInput.dataset.mealMember)}`, {
+        method: "PUT",
+        body: JSON.stringify({ count: mealInput.value })
+      });
+      showToast("Meal count saved.");
+    } else if (fixedInput) {
+      await api(`/api/members/${encodeURIComponent(fixedInput.dataset.fixedMember)}/fixed-amount`, {
+        method: "PUT",
+        body: JSON.stringify({ amount: fixedInput.value })
+      });
+      showToast("Fixed cost saved.");
+    }
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+
 document.addEventListener("click", async (event) => {
   if (event.target === elements.loginPanel) {
     elements.loginPanel.classList.add("hidden");
     return;
   }
 
+  const quickAction = event.target.closest("[data-focus]");
+  if (quickAction) {
+    setTimeout(() => document.getElementById(quickAction.dataset.focus)?.querySelector("input, select")?.focus());
+    return;
+  }
+
   const removeFixedRowButton = event.target.closest("[data-remove-fixed-row]");
   if (removeFixedRowButton) {
-    const index = Number(removeFixedRowButton.dataset.removeFixedRow);
-    fixedCostDraft.splice(index, 1);
+    fixedCostDraft.splice(Number(removeFixedRowButton.dataset.removeFixedRow), 1);
     if (!fixedCostDraft.length) {
       fixedCostDraft.push({ id: "", label: "", amount: "" });
     }
     renderFixedCosts();
+    return;
+  }
+
+  const editMember = event.target.closest("[data-edit-member]");
+  if (editMember) {
+    const member = state.store.members.find((item) => item.id === editMember.dataset.editMember);
+    const fields = forms.member.elements;
+    fields.id.value = member.id;
+    fields.name.value = member.name;
+    fields.mobile.value = member.mobile || "";
+    fields.role.value = member.role;
+    fields.password.value = "";
+    fields.password.placeholder = "Leave empty to keep current password";
+    elements.memberFormTitle.textContent = `Edit ${member.name}`;
+    elements.cancelMemberEdit.classList.remove("hidden");
+    fields.name.focus();
+    return;
+  }
+
+  const editBazar = event.target.closest("[data-edit-bazar]");
+  if (editBazar) {
+    const entry = state.store.bazarEntries.find((item) => item.id === editBazar.dataset.editBazar);
+    const fields = forms.bazar.elements;
+    fields.id.value = entry.id;
+    fields.memberId.value = entry.memberId;
+    fields.date.value = entry.date || today();
+    fields.amount.value = entry.amount;
+    fields.description.value = entry.description || "";
+    elements.bazarFormTitle.textContent = `Edit bazar of ${memberName(entry.memberId)}`;
+    elements.cancelBazarEdit.classList.remove("hidden");
+    fields.amount.focus();
     return;
   }
 
@@ -775,7 +1000,6 @@ document.addEventListener("click", async (event) => {
         method: "PUT",
         body: JSON.stringify({ approved: true })
       });
-      await refreshLoginOptions();
       showToast("Member approved.");
     } catch (error) {
       showToast(error.message);
@@ -787,19 +1011,18 @@ document.addEventListener("click", async (event) => {
   if (!button) {
     return;
   }
+  if (button.dataset.delete === "members" && !window.confirm("Remove this member?")) {
+    return;
+  }
   try {
-    await api(`/api/${button.dataset.delete}/${encodeURIComponent(button.dataset.id)}`, {
-      method: "DELETE"
-    });
-    await refreshLoginOptions();
-    if (button.dataset.delete === "fixed-costs" && isAdmin()) {
-      setFixedCostDraftFromState();
-    }
+    await api(`/api/${button.dataset.delete}/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
     showToast("Deleted.");
   } catch (error) {
     showToast(error.message);
   }
 });
+
+// ---------- start ----------
 
 async function init() {
   document.querySelectorAll('input[type="date"]').forEach((input) => {
@@ -807,13 +1030,9 @@ async function init() {
   });
 
   try {
-    await refreshLoginOptions();
     await api("/api/state");
-    if (isAdmin()) {
-      setFixedCostDraftFromState();
-    }
   } catch (error) {
-    await loadPublicState();
+    showLoggedOut();
   }
 }
 
